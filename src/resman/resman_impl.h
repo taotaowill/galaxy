@@ -153,6 +153,18 @@ public:
                  const ::baidu::galaxy::proto::PreemptRequest* request,
                  ::baidu::galaxy::proto::PreemptResponse* response,
                  ::google::protobuf::Closure* done);
+    void FreezeAgent(::google::protobuf::RpcController* controller,
+                     const ::baidu::galaxy::proto::FreezeAgentRequest* request,
+                     ::baidu::galaxy::proto::FreezeAgentResponse* response,
+                     ::google::protobuf::Closure* done);
+    void ThawAgent(::google::protobuf::RpcController* controller,
+                   const ::baidu::galaxy::proto::ThawAgentRequest* request,
+                   ::baidu::galaxy::proto::ThawAgentResponse* response,
+                   ::google::protobuf::Closure* done);
+    void RemoveTagsFromAgent(::google::protobuf::RpcController* controller,
+                             const ::baidu::galaxy::proto::RemoveTagsFromAgentRequest* request,
+                             ::baidu::galaxy::proto::RemoveTagsFromAgentResponse* response,
+                             ::google::protobuf::Closure* done);
 private:
 
     void QueryAgent(const std::string& agent_endpoint, bool is_first_query);
@@ -171,10 +183,10 @@ private:
                                  bool fail, int err);
     void SendCommandsToAgent(const std::string& agent_endpoint,
                              const std::vector<sched::AgentCommand>& commands);
-    template <class ProtoClass> 
+    template <class ProtoClass>
     bool SaveObject(const std::string& key,
                     const ProtoClass& obj);
-    
+
     template <class ProtoClass>
     bool LoadObjects(const std::string& prefix,
                      std::map<std::string, ProtoClass>& objs);
@@ -183,9 +195,9 @@ private:
     static void OnRMLockChange(const ::galaxy::ins::sdk::WatchParam& param,
                                ::galaxy::ins::sdk::SDKError err);
     void OnLockChange(std::string lock_session_id);
-    
+
     template <class RpcRequest, class RpcResponse, class DoneClosure>
-    bool CheckUserExist(const RpcRequest* request, 
+    bool CheckUserExist(const RpcRequest* request,
                         RpcResponse* response,
                         DoneClosure* done);
     void ReloadUsersAuth();

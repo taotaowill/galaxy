@@ -27,8 +27,8 @@ public:
     bool RemoveAgent(const std::string& endpoint);
     bool ListAgentsByPool(const std::string& pool, const std::string& soptions);
     bool ShowAgent(const std::string& endpoint, const std::string& soptions);
-    bool ListAgentsByTag(const std::string& tag, 
-                         const std::string& pool, 
+    bool ListAgentsByTag(const std::string& tag,
+                         const std::string& pool,
                          const std::string& soptions);
     bool ListAgents(const std::string& soptions);
     bool EnterSafeMode();
@@ -43,7 +43,7 @@ public:
     bool RemoveUser(const std::string& user);
     bool ListUsers();
     bool ShowUser(const std::string& user);
-    bool GrantUser(const std::string& user, const std::string& pool, 
+    bool GrantUser(const std::string& user, const std::string& pool,
                    const std::string& opration, const std::string& authority);
     bool AssignQuota(const std::string& user,
                      uint32_t millicores,
@@ -53,6 +53,9 @@ public:
                      uint32_t replica
                   );
     bool Preempt(const std::string& container_group_id, const std::string& endpoint);
+    bool FreezeAgent(const std::string& endpoint);
+    bool ThawAgent(const std::string& endpoint);
+    bool RemoveTagsFromAgent(const std::string& endpoint, const std::string& tags);
 
     bool GetTagsByAgent(const std::string& endpoint);
     bool AddAgentToPool(const std::string& endpoint, const std::string& pool);

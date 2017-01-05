@@ -4,6 +4,7 @@
 
 #include "agent_impl.h"
 #include "setting_utils.h"
+#include "utils/event_log.h"
 
 #include <sofa/pbrpc/pbrpc.h>
 #include <glog/logging.h>
@@ -22,6 +23,8 @@
 #include <vector>
 
 DECLARE_string(agent_port);
+DECLARE_string(agent_ip);
+DECLARE_string(agent_hostname);
 
 static volatile bool s_quit = false;
 static void SignalIntHandler(int /*sig*/)
@@ -66,6 +69,11 @@ int main(int argc, char* argv[])
         exit(-2);
     }
 
+    baidu::galaxy::EventLog ev("agent");
+    LOG(ERROR) << ev.Append("hostname", FLAGS_agent_hostname)
+        .Append("endpoint", FLAGS_agent_ip + ":" + FLAGS_agent_port)
+        .AppendTime("time")
+        .Append("action", "start").ToString();
 
     signal(SIGINT, SignalIntHandler);
     signal(SIGTERM, SignalIntHandler);
@@ -75,6 +83,11 @@ int main(int argc, char* argv[])
     while (!s_quit) {
         sleep(1);
     }
+    ev.Reset();
+    LOG(ERROR) << ev.Append("agent", FLAGS_agent_hostname)
+        .AppendTime("time")
+        .Append("action", "stop").ToString();
+    _exit(0);
 
     return 0;
 }

@@ -1,4 +1,4 @@
-protoc = Builder(action='thirdparty/bin/protoc --proto_path=./src/protocol/  --cpp_out=./src/protocol/ $SOURCE') 
+protoc = Builder(action='thirdparty/bin/protoc --proto_path=./src/protocol/  --cpp_out=./src/protocol/ $SOURCE')
 env_gen = Environment(BUILDERS={'Protoc':protoc})
 
 env_gen.Protoc(['src/protocol/galaxy.pb.h','src/protocol/galaxy.pb.cc'], 'src/protocol/galaxy.proto')
@@ -9,7 +9,7 @@ env_gen.Protoc(['src/protocol/appworker.pb.h','src/protocol/appworker.pb.cc'], '
 
 
 env = Environment(
-        CPPPATH = ['.', 'src', 'src/agent', 'thirdparty/boost_1_57_0/', './thirdparty/include', './thirdparty/rapidjson/include', 'src/utils'] ,
+        CPPPATH = ['.', 'src', 'src/agent', 'thirdparty/boost_1_57_0/', './thirdparty/include', './thirdparty/include/common', './thirdparty/rapidjson/include', 'src/utils'] ,
         LIBS = ['ins_sdk', 'sofa-pbrpc', 'protobuf', 'glog', 'gflags', 'tcmalloc', 'unwind', 'pthread', 'z', 'rt', 'boost_filesystem', 'gtest', 'common', 'leveldb', 'snappy'],
         LIBPATH = ['./thirdparty/lib', './thirdparty/boost_1_57_0/stage/lib'],
         CCFLAGS = '-g2 -Wall -Werror -Wno-unused-but-set-variable',
@@ -27,7 +27,7 @@ env.Program('appworker', Glob('src/appworker/*.cc') + Glob('src/utils/*.cc')
 env.Program('agent', Glob('src/agent/*.cc') + Glob('src/utils/*.cc') + Glob('src/agent/*/*.cc')
             + ['src/protocol/agent.pb.cc', 'src/protocol/galaxy.pb.cc', 'src/protocol/resman.pb.cc'])
 
-env.StaticLibrary('galaxy_sdk',  ['src/protocol/appmaster.pb.cc', 'src/protocol/galaxy.pb.cc', 
+env.StaticLibrary('galaxy_sdk',  ['src/protocol/appmaster.pb.cc', 'src/protocol/galaxy.pb.cc',
                     'src/sdk/galaxy_sdk_util.cc', 'src/sdk/galaxy_sdk_appmaster.cc'])
 env.StaticLibrary('naming_sdk', ['src/protocol/appmaster.pb.cc', 'src/protocol/galaxy.pb.cc', 'src/naming/private_sdk.cc'])
 

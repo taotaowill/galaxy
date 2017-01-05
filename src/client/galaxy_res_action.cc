@@ -4,6 +4,8 @@
 
 #include <algorithm>
 #include <tprinter.h>
+#include <boost/algorithm/string.hpp>
+#include <boost/algorithm/string/split.hpp>
 #include "galaxy_res_action.h"
 
 DEFINE_string(nexus_root, "/galaxy3", "root prefix on nexus");
@@ -17,7 +19,7 @@ namespace baidu {
 namespace galaxy {
 namespace client {
 
-ResAction::ResAction() : resman_(NULL) { 
+ResAction::ResAction() : resman_(NULL) {
     user_.user =  FLAGS_username;
     user_.token = FLAGS_token;
 }
@@ -42,11 +44,11 @@ bool ResAction::CreateContainerGroup(const std::string& json_file, const std::st
         fprintf(stderr, "json_file and jobid are needed\n");
         return false;
     }
-    
+
     if(!this->Init()) {
         return false;
     }
-    
+
     ::baidu::galaxy::sdk::CreateContainerGroupRequest request;
     ::baidu::galaxy::sdk::CreateContainerGroupResponse response;
 
@@ -62,7 +64,7 @@ bool ResAction::CreateContainerGroup(const std::string& json_file, const std::st
         fprintf(stderr, "container_type must be normal or volum\n");
         return false;
     }
-    
+
     if (ok != 0) {
         return false;
     }
@@ -90,7 +92,7 @@ bool ResAction::CreateContainerGroup(const std::string& json_file, const std::st
             cgroup.memory = job.pod.tasks[i].memory;
             cgroup.tcp_throt = job.pod.tasks[i].tcp_throt;
             cgroup.blkio = job.pod.tasks[i].blkio;
-        
+
             for (uint32_t j = 0; j < job.pod.tasks[i].ports.size(); ++j) {
                 ::baidu::galaxy::sdk::PortRequired port;
                 port.port_name = job.pod.tasks[i].ports[j].port_name;
@@ -107,7 +109,7 @@ bool ResAction::CreateContainerGroup(const std::string& json_file, const std::st
     if (ret) {
         printf("Create container group %s\n", response.id.c_str());
     } else {
-        printf("Create container group failed for reason %s:%s\n", 
+        printf("Create container group failed for reason %s:%s\n",
                     StringStatus(response.error_code.status).c_str(), response.error_code.reason.c_str());
     }
     return ret;
@@ -118,14 +120,14 @@ bool ResAction::UpdateContainerGroup(const std::string& json_file, const std::st
         fprintf(stderr, "json_file and id are needed\n");
         return false;
     }
-    
+
     if(!this->Init()) {
         return false;
     }
-    
+
     ::baidu::galaxy::sdk::UpdateContainerGroupRequest request;
     ::baidu::galaxy::sdk::UpdateContainerGroupResponse response;
-    
+
     ::baidu::galaxy::sdk::JobDescription job;
     int ok = 0;
     if (container_type.compare("normal") == 0) {
@@ -138,7 +140,7 @@ bool ResAction::UpdateContainerGroup(const std::string& json_file, const std::st
         fprintf(stderr, "container_type must be normal or volum\n");
         return false;
     }
-    
+
     if (ok != 0) {
         return false;
     }
@@ -159,7 +161,7 @@ bool ResAction::UpdateContainerGroup(const std::string& json_file, const std::st
     request.desc.tag = job.deploy.tag;
     request.desc.pool_names.assign(job.deploy.pools.begin(), job.deploy.pools.end());
 
-   
+
     if (container_type.compare("normal") == 0) {
         for (uint32_t i = 0; i < job.pod.tasks.size(); ++i) {
             ::baidu::galaxy::sdk::Cgroup cgroup;
@@ -167,7 +169,7 @@ bool ResAction::UpdateContainerGroup(const std::string& json_file, const std::st
             cgroup.memory = job.pod.tasks[i].memory;
             cgroup.tcp_throt = job.pod.tasks[i].tcp_throt;
             cgroup.blkio = job.pod.tasks[i].blkio;
-        
+
             for (uint32_t j = 0; j < job.pod.tasks[i].ports.size(); ++j) {
                 ::baidu::galaxy::sdk::PortRequired port;
                 port.port_name = job.pod.tasks[i].ports[j].port_name;
@@ -184,7 +186,7 @@ bool ResAction::UpdateContainerGroup(const std::string& json_file, const std::st
     if (ret) {
         printf("Update container group %s\n", id.c_str());
     } else {
-        printf("Update container group failed for reason %s:%s\n", 
+        printf("Update container group failed for reason %s:%s\n",
                     StringStatus(response.error_code.status).c_str(), response.error_code.reason.c_str());
     }
     return ret;
@@ -195,7 +197,7 @@ bool ResAction::RemoveContainerGroup(const std::string& id) {
         fprintf(stderr, "id is needed\n");
         return false;
     }
-    
+
     if(!this->Init()) {
         return false;
     }
@@ -208,7 +210,7 @@ bool ResAction::RemoveContainerGroup(const std::string& id) {
     if (ret) {
         printf("Remove container group %s\n", id.c_str());
     } else {
-        printf("Remove container group failed for reason %s:%s\n", 
+        printf("Remove container group failed for reason %s:%s\n",
                     StringStatus(response.error_code.status).c_str(), response.error_code.reason.c_str());
     }
     return ret;
@@ -350,7 +352,7 @@ bool ResAction::ListContainerGroups(const std::string& soptions) {
         }
         printf("%s\n", containers.ToString().c_str());
     } else {
-        printf("List container group failed for reason %s:%s\n", 
+        printf("List container group failed for reason %s:%s\n",
                     StringStatus(response.error_code.status).c_str(), response.error_code.reason.c_str());
     }
     return ret;
@@ -361,7 +363,7 @@ bool ResAction::ShowAgent(const std::string& endpoint, const std::string& soptio
         fprintf(stderr, "endpoint is needed\n");
         return false;
     }
-    
+
     if(!this->Init()) {
         return false;
     }
@@ -396,7 +398,7 @@ bool ResAction::ShowAgent(const std::string& endpoint, const std::string& soptio
         ::baidu::common::TPrinter containers(headers.size());
         containers.AddRow(headers);
         for (uint32_t i = 0; i < response.containers.size(); ++i) {
-            //size_t pos = response.containers[i].id.rfind("."); 
+            //size_t pos = response.containers[i].id.rfind(".");
             //std::string id(response.containers[i].id, pos + 1, response.containers[i].id.size()- (pos + 1));
 
             std::string scpu;
@@ -412,14 +414,14 @@ bool ResAction::ShowAgent(const std::string& endpoint, const std::string& soptio
                 smem = HumanReadableString(response.containers[i].memory.assigned) + "/" +
                        HumanReadableString(response.containers[i].memory.used);
             }
-            
-            std::vector<std::string> values;      
+
+            std::vector<std::string> values;
             if (options.size() == 0 || find(options.begin(), options.end(), "volums") != options.end()) {
                 for (uint32_t j = 0; j < response.containers[i].volums.size(); ++j) {
                     values.clear();
                     std::string svolums;
-                    //svolums =  "vol_" + ::baidu::common::NumToString(j) + " " 
-                    svolums =  StringVolumMedium(response.containers[i].volums[j].medium) + "/" 
+                    //svolums =  "vol_" + ::baidu::common::NumToString(j) + " "
+                    svolums =  StringVolumMedium(response.containers[i].volums[j].medium) + "/"
                                 //+ HumanReadableString(response.containers[i].volums[j].volum.total) + "/"
                                 + HumanReadableString(response.containers[i].volums[j].volum.assigned) + "/"
                                 + HumanReadableString(response.containers[i].volums[j].volum.used) + " "
@@ -488,7 +490,7 @@ bool ResAction::ShowAgent(const std::string& endpoint, const std::string& soptio
         }
         printf("%s\n", containers.ToString().c_str());
     } else {
-        printf("Show container group failed for reason %s:%s\n", 
+        printf("Show container group failed for reason %s:%s\n",
                     StringStatus(response.error_code.status).c_str(), response.error_code.reason.c_str());
     }
     return false;
@@ -499,7 +501,7 @@ bool ResAction::ShowContainerGroup(const std::string& id) {
         fprintf(stderr, "id is needed\n");
         return false;
     }
-    
+
     if(!this->Init()) {
         return false;
     }
@@ -513,7 +515,7 @@ bool ResAction::ShowContainerGroup(const std::string& id) {
         printf("base infomation\n");
         ::baidu::common::TPrinter base(8);
         base.AddRow(8, "user", "version", "priority", "type", "cmd_line", "max_per_host", "tag", "pools");
-        std::string pools; 
+        std::string pools;
         for (size_t i = 0; i < response.desc.pool_names.size(); ++i) {
             pools += response.desc.pool_names[i];
             if (i != response.desc.pool_names.size() - 1) {
@@ -563,7 +565,7 @@ bool ResAction::ShowContainerGroup(const std::string& id) {
                               );
         }
         printf("%s\n", data_volums.ToString().c_str());
-        
+
         printf("cgroups infomation\n");
         ::baidu::common::TPrinter cgroups(11);
         cgroups.AddRow(11, "", "id", "cpu_cores", "cpu_excess", "mem_size", "mem_excess", "tcp_recv_bps", "tcp_recv_excess", "tcp_send_bps", "tcp_send_excess", "blk_weight");
@@ -583,26 +585,26 @@ bool ResAction::ShowContainerGroup(const std::string& id) {
                             );
         }
         printf("%s\n", cgroups.ToString().c_str());
-                
+
         printf("containers infomation\n");
         ::baidu::common::TPrinter containers(8);
         containers.AddRow(8, "", "id", "endpoint", "status", "last_error", "cpu(a/u)", "mem(a/u)", "volums(id/medium/a/u)");
         for (uint32_t i = 0; i < response.containers.size(); ++i) {
-            size_t pos = response.containers[i].id.rfind("."); 
+            size_t pos = response.containers[i].id.rfind(".");
             std::string id(response.containers[i].id, pos + 1, response.containers[i].id.size()- (pos + 1));
 
             //std::string scpu = ::baidu::common::NumToString(response.containers[i].cpu.total / 1000.0) + "/" +
             std::string scpu = ::baidu::common::NumToString(response.containers[i].cpu.assigned / 1000.0) + "/" +
                                ::baidu::common::NumToString(response.containers[i].cpu.used / 1000.0);
-             
+
             //std::string smem = HumanReadableString(response.containers[i].memory.total) + "/" +
             std::string smem = HumanReadableString(response.containers[i].memory.assigned) + "/" +
                                HumanReadableString(response.containers[i].memory.used);
-                   
+
             for (uint32_t j = 0; j < response.containers[i].volums.size(); ++j) {
                 std::string svolums;
-                svolums +=  "vol_" + ::baidu::common::NumToString(j) + " " 
-                            + StringVolumMedium(response.containers[i].volums[j].medium) + " " 
+                svolums +=  "vol_" + ::baidu::common::NumToString(j) + " "
+                            + StringVolumMedium(response.containers[i].volums[j].medium) + " "
                             //+ HumanReadableString(response.containers[i].volums[j].volum.total) + "/"
                             + HumanReadableString(response.containers[i].volums[j].volum.assigned) + "/"
                             + HumanReadableString(response.containers[i].volums[j].volum.used) + " "
@@ -646,7 +648,7 @@ bool ResAction::ShowContainerGroup(const std::string& id) {
         printf("%s\n", containers.ToString().c_str());
 
     } else {
-        printf("Show container group failed for reason %s:%s\n", 
+        printf("Show container group failed for reason %s:%s\n",
                     StringStatus(response.error_code.status).c_str(), response.error_code.reason.c_str());
     }
     return ret;
@@ -670,7 +672,7 @@ bool ResAction::AddAgent(const std::string& pool, const std::string& endpoint) {
     if (ret) {
         printf("Add agent successfully\n");
     } else {
-        printf("Add agent failed for reason %s:%s\n", 
+        printf("Add agent failed for reason %s:%s\n",
                     StringStatus(response.error_code.status).c_str(), response.error_code.reason.c_str());
     }
     return ret;
@@ -680,7 +682,7 @@ bool ResAction::RemoveAgent(const std::string& endpoint) {
     if (endpoint.empty()) {
         return false;
     }
-    
+
     if(!this->Init()) {
         return false;
     }
@@ -694,7 +696,7 @@ bool ResAction::RemoveAgent(const std::string& endpoint) {
     if (ret) {
         printf("Remove agent successfully\n");
     } else {
-        printf("remove agent failed for reason %s:%s\n", 
+        printf("remove agent failed for reason %s:%s\n",
                     StringStatus(response.error_code.status).c_str(), response.error_code.reason.c_str());
     }
 
@@ -706,7 +708,7 @@ bool ResAction::ListAgents(const std::string& soptions) {
     if(!this->Init()) {
         return false;
     }
-    
+
     std::vector<std::string> options;
     ::baidu::common::SplitString(soptions, ",", &options);
 
@@ -759,7 +761,7 @@ bool ResAction::ListAgents(const std::string& soptions) {
                        HumanReadableString(response.agents[i].memory.assigned) + "/" +
                        HumanReadableString(response.agents[i].memory.used);
             }
-            
+
             std::vector<std::string> values;
             if (options.size() == 0 || find(options.begin(), options.end(), "volums") != options.end()) {
                 for (uint32_t j = 0; j < response.agents[i].volums.size(); ++j) {
@@ -819,7 +821,7 @@ bool ResAction::ListAgents(const std::string& soptions) {
                     agents.AddRow(values);
                 }
             }
-            
+
             if (options.size() != 0 && find(options.begin(), options.end(), "volums") == options.end()) {
                 values.push_back(::baidu::common::NumToString(i));
                 values.push_back(response.agents[i].endpoint);
@@ -839,7 +841,7 @@ bool ResAction::ListAgents(const std::string& soptions) {
         printf("%s\n", agents.ToString().c_str());
 
     } else {
-        printf("List agents failed for reason %s:%s\n", 
+        printf("List agents failed for reason %s:%s\n",
                     StringStatus(response.error_code.status).c_str(), response.error_code.reason.c_str());
     }
 
@@ -851,7 +853,7 @@ bool ResAction::ListAgentsByTag(const std::string& tag, const std::string& pool,
     if (tag.empty()) {
         return false;
     }
-    
+
     if(!this->Init()) {
         return false;
     }
@@ -913,7 +915,7 @@ bool ResAction::ListAgentsByTag(const std::string& tag, const std::string& pool,
                        HumanReadableString(response.agents[i].memory.assigned) + "/" +
                        HumanReadableString(response.agents[i].memory.used);
             }
-            
+
             std::vector<std::string> values;
             if (options.size() == 0 || find(options.begin(), options.end(), "volums") != options.end()) {
                 for (uint32_t j = 0; j < response.agents[i].volums.size(); ++j) {
@@ -975,7 +977,7 @@ bool ResAction::ListAgentsByTag(const std::string& tag, const std::string& pool,
                     ++count;
                 }
             }
-            
+
             if (options.size() != 0 && find(options.begin(), options.end(), "volums") == options.end()) {
                 values.push_back(::baidu::common::NumToString(count));
                 values.push_back(response.agents[i].endpoint);
@@ -996,7 +998,7 @@ bool ResAction::ListAgentsByTag(const std::string& tag, const std::string& pool,
         printf("%s\n", agents.ToString().c_str());
 
     } else {
-        printf("List agents failed for reason %s:%s\n", 
+        printf("List agents failed for reason %s:%s\n",
                     StringStatus(response.error_code.status).c_str(), response.error_code.reason.c_str());
     }
 
@@ -1008,7 +1010,7 @@ bool ResAction::ListAgentsByPool(const std::string& pool, const std::string& sop
     if (pool.empty()) {
         return false;
     }
-    
+
     if(!this->Init()) {
         return false;
     }
@@ -1067,7 +1069,7 @@ bool ResAction::ListAgentsByPool(const std::string& pool, const std::string& sop
                        HumanReadableString(response.agents[i].memory.assigned) + "/" +
                        HumanReadableString(response.agents[i].memory.used);
             }
-            
+
             std::vector<std::string> values;
             if (options.size() == 0 || find(options.begin(), options.end(), "volums") != options.end()) {
                 for (uint32_t j = 0; j < response.agents[i].volums.size(); ++j) {
@@ -1127,7 +1129,7 @@ bool ResAction::ListAgentsByPool(const std::string& pool, const std::string& sop
                     agents.AddRow(values);
                 }
             }
-            
+
             if (options.size() != 0 && find(options.begin(), options.end(), "volums") == options.end()) {
                 values.push_back(::baidu::common::NumToString(i));
                 values.push_back(response.agents[i].endpoint);
@@ -1147,7 +1149,7 @@ bool ResAction::ListAgentsByPool(const std::string& pool, const std::string& sop
         printf("%s\n", agents.ToString().c_str());
 
     } else {
-        printf("List agents failed for reason %s:%s\n", 
+        printf("List agents failed for reason %s:%s\n",
                     StringStatus(response.error_code.status).c_str(), response.error_code.reason.c_str());
     }
 
@@ -1166,7 +1168,7 @@ bool ResAction::EnterSafeMode() {
 
     bool ret = resman_->EnterSafeMode(request, &response);
     if (ret) {
-        printf("Enter safemode successfully");
+        printf("Enter safemode successfully\n");
     } else {
         printf("Enter safemode failed for reason %s:%s\n",
                     StringStatus(response.error_code.status).c_str(), response.error_code.reason.c_str());
@@ -1175,7 +1177,7 @@ bool ResAction::EnterSafeMode() {
 }
 
 bool ResAction::LeaveSafeMode() {
-    
+
     if(!this->Init()) {
         return false;
     }
@@ -1186,7 +1188,7 @@ bool ResAction::LeaveSafeMode() {
 
     bool ret = resman_->LeaveSafeMode(request, &response);
     if (ret) {
-        printf("Leave safemode successfully");
+        printf("Leave safemode successfully\n");
     } else {
         printf("Leave safemode failed for reason %s:%s\n",
                     StringStatus(response.error_code.status).c_str(), response.error_code.reason.c_str());
@@ -1206,11 +1208,11 @@ bool ResAction::OnlineAgent(const std::string& endpoint) {
     ::baidu::galaxy::sdk::OnlineAgentRequest request;
     ::baidu::galaxy::sdk::OnlineAgentResponse response;
     request.user = user_;
-    request.endpoint = endpoint; 
+    request.endpoint = endpoint;
 
     bool ret = resman_->OnlineAgent(request, &response);
     if (ret) {
-        printf("Online agent successfully");
+        printf("Online agent successfully\n");
     } else {
         printf("Online agent failed for reason %s:%s\n",
                     StringStatus(response.error_code.status).c_str(), response.error_code.reason.c_str());
@@ -1230,11 +1232,11 @@ bool ResAction::OfflineAgent(const std::string& endpoint) {
     ::baidu::galaxy::sdk::OfflineAgentRequest request;
     ::baidu::galaxy::sdk::OfflineAgentResponse response;
     request.user = user_;
-    request.endpoint = endpoint; 
+    request.endpoint = endpoint;
 
     bool ret = resman_->OfflineAgent(request, &response);
     if (ret) {
-        printf("Offline agent successfully");
+        printf("Offline agent successfully\n");
     } else {
         printf("Offline agent failed for reason %s:%s\n",
                     StringStatus(response.error_code.status).c_str(), response.error_code.reason.c_str());
@@ -1256,7 +1258,7 @@ bool ResAction::Status() {
     ::baidu::galaxy::sdk::StatusRequest request;
     ::baidu::galaxy::sdk::StatusResponse response;
     request.user = user_;
-    
+
     std::string resman_endpoint;
     std::string appmaster_endpoint;
     std::string path = FLAGS_nexus_root + FLAGS_appmaster_path;
@@ -1265,7 +1267,7 @@ bool ResAction::Status() {
         fprintf(stderr, "get master endpoint failed\n");
         return false;
     }
-    
+
     ret = resman_->Status(request, &response);
     if (!ret) {
         printf("Get Status failed for reason %s:%s\n",
@@ -1273,7 +1275,7 @@ bool ResAction::Status() {
         return false;
 
     }
-    
+
     ::baidu::galaxy::sdk::ListAgentsRequest list_request;
     ::baidu::galaxy::sdk::ListAgentsResponse list_response;
     list_request.user = user_;
@@ -1293,9 +1295,9 @@ bool ResAction::Status() {
     printf("%s\n", master.ToString().c_str());
 
     printf("cluster agent infomation\n");
-    ::baidu::common::TPrinter agent(3); 
+    ::baidu::common::TPrinter agent(3);
     agent.AddRow(3, "total", "alive", "dead");
-    agent.AddRow(3, baidu::common::NumToString(response.total_agents).c_str(), 
+    agent.AddRow(3, baidu::common::NumToString(response.total_agents).c_str(),
                     baidu::common::NumToString(response.alive_agents).c_str(),
                     baidu::common::NumToString(response.dead_agents).c_str());
     printf("%s\n", agent.ToString().c_str());
@@ -1303,7 +1305,7 @@ bool ResAction::Status() {
     printf("cluster cpu infomation\n");
     ::baidu::common::TPrinter cpu(3);
     cpu.AddRow(3, "total", "assigned", "used");
-    cpu.AddRow(3, ::baidu::common::NumToString(response.cpu.total / 1000.0).c_str(), 
+    cpu.AddRow(3, ::baidu::common::NumToString(response.cpu.total / 1000.0).c_str(),
                     ::baidu::common::NumToString(response.cpu.assigned / 1000.0).c_str(),
                     ::baidu::common::NumToString(response.cpu.used / 1000.0).c_str());
     printf("%s\n", cpu.ToString().c_str());
@@ -1311,7 +1313,7 @@ bool ResAction::Status() {
     printf("cluster memory infomation\n");
     ::baidu::common::TPrinter mem(3);
     mem.AddRow(3, "total", "assigned", "used");
-    mem.AddRow(3, HumanReadableString(response.memory.total).c_str(), 
+    mem.AddRow(3, HumanReadableString(response.memory.total).c_str(),
                   HumanReadableString(response.memory.assigned).c_str(),
                   HumanReadableString(response.memory.used).c_str());
     printf("%s\n", mem.ToString().c_str());
@@ -1320,20 +1322,20 @@ bool ResAction::Status() {
     ::baidu::common::TPrinter volum(6);
     volum.AddRow(6, "", "medium", "total", "assigned", "used", "device_path");
     for (uint32_t i = 0; i < response.volum.size(); ++i) {
-        volum.AddRow(6, ::baidu::common::NumToString(i).c_str(),  
-                        StringVolumMedium(response.volum[i].medium).c_str(), 
-                        //::baidu::common::NumToString(response.volum[i].medium).c_str(), 
+        volum.AddRow(6, ::baidu::common::NumToString(i).c_str(),
+                        StringVolumMedium(response.volum[i].medium).c_str(),
+                        //::baidu::common::NumToString(response.volum[i].medium).c_str(),
                         HumanReadableString(response.volum[i].volum.total).c_str(),
                         HumanReadableString(response.volum[i].volum.assigned).c_str(),
                         HumanReadableString(response.volum[i].volum.used).c_str(),
                         response.volum[i].device_path.c_str());
     }
     printf("%s\n", volum.ToString().c_str());
-    
+
     printf("cluster containers infomation\n");
     ::baidu::common::TPrinter other(3);
     other.AddRow(3, "total_groups", "total_containers", "in_safe_mode");
-    other.AddRow(3, ::baidu::common::NumToString(response.total_groups).c_str(), 
+    other.AddRow(3, ::baidu::common::NumToString(response.total_groups).c_str(),
                     ::baidu::common::NumToString(response.total_containers).c_str(),
                     StringBool(response.in_safe_mode).c_str());
     printf("%s\n", other.ToString().c_str());
@@ -1355,7 +1357,7 @@ bool ResAction::Status() {
             resource_temp.cpu.assigned = 0;
             resource_temp.cpu.used = 0;
             //mem
-            resource_temp.memory.total = 0; 
+            resource_temp.memory.total = 0;
             resource_temp.memory.assigned = 0;
             resource_temp.memory.used = 0;
         }
@@ -1364,7 +1366,7 @@ bool ResAction::Status() {
         resource_temp.cpu.total += list_response.agents[i].cpu.total;
         resource_temp.cpu.assigned += list_response.agents[i].cpu.assigned;
         resource_temp.cpu.used += list_response.agents[i].cpu.used;
-        
+
         //mem
         resource_temp.memory.total += list_response.agents[i].memory.total;
         resource_temp.memory.assigned += list_response.agents[i].memory.assigned;
@@ -1409,7 +1411,7 @@ bool ResAction::Status() {
                                      HumanReadableString(volum_temp.used);
             if (it == resource_stat[temp_pool].volums.begin()) {
                 pool.AddRow(7, ::baidu::common::NumToString(i).c_str(),
-                               response.pools[i].name.c_str(), 
+                               response.pools[i].name.c_str(),
                                ::baidu::common::NumToString(response.pools[i].total_agents).c_str(),
                                ::baidu::common::NumToString(response.pools[i].alive_agents).c_str(),
                                cpu_stat.c_str(),
@@ -1417,7 +1419,7 @@ bool ResAction::Status() {
                                volum_stat.c_str());
             } else {
                 pool.AddRow(7, "",
-                               "", 
+                               "",
                                "",
                                "",
                                "",
@@ -1425,19 +1427,19 @@ bool ResAction::Status() {
                                volum_stat.c_str());
 
             }
-                                        
+
         }
 
         if (resource_stat[temp_pool].volums.size() == 0) {
 
             pool.AddRow(7, ::baidu::common::NumToString(i).c_str(),
-                           response.pools[i].name.c_str(), 
+                           response.pools[i].name.c_str(),
                            ::baidu::common::NumToString(response.pools[i].total_agents).c_str(),
                            ::baidu::common::NumToString(response.pools[i].alive_agents).c_str(),
                            cpu_stat.c_str(),
                            mem_stat.c_str(),
                            "");
-                        
+
         }
     }
     printf("%s\n", pool.ToString().c_str());
@@ -1588,7 +1590,7 @@ bool ResAction::ListUsers() {
     request.user = user_;
 
     bool ret = resman_->ListUsers(request, &response);
-    
+
     if (ret) {
         ::baidu::common::TPrinter users(2);
         users.AddRow(2, "", "user");
@@ -1622,7 +1624,7 @@ bool ResAction::ShowUser(const std::string& user) {
     request.user.token = "default";
 
     bool ret = resman_->ShowUser(request, &response);
-    
+
     if (ret) {
         printf("authority infomation\n");
         ::baidu::common::TPrinter grants(3);
@@ -1679,11 +1681,11 @@ bool ResAction::ShowUser(const std::string& user) {
     return ret;
 }
 
-bool ResAction::GrantUser(const std::string& user, 
-                          const std::string& pool, 
+bool ResAction::GrantUser(const std::string& user,
+                          const std::string& pool,
                           const std::string& opration,
                           const std::string& authority) {
-    
+
     if (user.empty() || pool.empty()) {
         fprintf(stderr, "user and pool is needed\n");
         return false;
@@ -1692,14 +1694,14 @@ bool ResAction::GrantUser(const std::string& user,
     if(!this->Init()) {
         return false;
     }
-        
+
     ::baidu::galaxy::sdk::Grant grant;
 
     if (opration.compare("add") == 0) {
-        grant.action = ::baidu::galaxy::sdk::kActionAdd; 
+        grant.action = ::baidu::galaxy::sdk::kActionAdd;
     } else if (opration.compare("remove") == 0){
         grant.action = ::baidu::galaxy::sdk::kActionRemove;
-    } else if (opration.compare("set") == 0) { 
+    } else if (opration.compare("set") == 0) {
         grant.action = ::baidu::galaxy::sdk::kActionSet;
     } else if (opration.compare("clear") == 0) {
         grant.action = ::baidu::galaxy::sdk::kActionClear;
@@ -1713,7 +1715,7 @@ bool ResAction::GrantUser(const std::string& user,
 
     for (size_t i = 0; i < authorities.size(); ++i) {
         ::baidu::galaxy::sdk::Authority kAuthority;
-        
+
         if (authorities[i].compare("create_container") == 0) {
             kAuthority = ::baidu::galaxy::sdk::kAuthorityCreateContainer;
         } else if (authorities[i].compare("remove_container") == 0) {
@@ -1732,7 +1734,7 @@ bool ResAction::GrantUser(const std::string& user,
             kAuthority = ::baidu::galaxy::sdk::kAuthorityListJobs;
         }else {
             return false;
-        } 
+        }
         grant.authority.push_back(kAuthority);
     }
     grant.pool = pool;
@@ -1767,7 +1769,7 @@ bool ResAction::AssignQuota(const std::string& user,
     if(!this->Init()) {
         return false;
     }
-    
+
     if (millicores <= 0 || replica <= 0) {
         printf("millicores and replica must be larger than 0\n");
         return false;
@@ -1802,7 +1804,7 @@ bool ResAction::AssignQuota(const std::string& user,
                     StringStatus(response.error_code.status).c_str(), response.error_code.reason.c_str());
     }
     return ret;
-} 
+}
 
 bool ResAction::Preempt(const std::string& container_group_id, const std::string& endpoint) {
 
@@ -1810,7 +1812,7 @@ bool ResAction::Preempt(const std::string& container_group_id, const std::string
         fprintf(stderr, "container_group_id and endpoint are needed\n");
         return false;
     }
-    
+
     if(!this->Init()) {
         return false;
     }
@@ -1822,11 +1824,95 @@ bool ResAction::Preempt(const std::string& container_group_id, const std::string
     request.endpoint = endpoint;
     bool ret = resman_->Preempt(request, &response);
     if (ret) {
-        printf("Preempt %s\n success", container_group_id.c_str());
+        printf("Preempt %s success\n", container_group_id.c_str());
     } else {
-        printf("Preempt %s failed for reason %s:%s\n", container_group_id.c_str(), 
+        printf("Preempt %s failed for reason %s:%s\n", container_group_id.c_str(),
                 StringStatus(response.error_code.status).c_str(), response.error_code.reason.c_str());
     }
+    return ret;
+}
+
+bool ResAction::FreezeAgent(const std::string& endpoint) {
+    if (endpoint.empty()) {
+        fprintf(stderr, "endpoint is needed\n");
+        return false;
+    }
+
+    if (!this->Init()) {
+        return false;
+    }
+
+    baidu::galaxy::sdk::FreezeAgentRequest request;
+    baidu::galaxy::sdk::FreezeAgentResponse response;
+    request.user = user_;
+    request.endpoint = endpoint;
+    bool ret = resman_->FreezeAgent(request, &response);
+    if (ret) {
+        printf("Freeze agent %s success\n", endpoint.c_str());
+    } else {
+        printf("Freeze agent %s failed for reason %s:%s\n", endpoint.c_str(),
+                StringStatus(response.error_code.status).c_str(), response.error_code.reason.c_str());
+    }
+    return ret;
+}
+
+bool ResAction::ThawAgent(const std::string& endpoint) {
+    if (endpoint.empty()) {
+        fprintf(stderr, "endpoint is needed\n");
+        return false;
+    }
+
+    if (!this->Init()) {
+        return false;
+    }
+
+    baidu::galaxy::sdk::ThawAgentRequest request;
+    baidu::galaxy::sdk::ThawAgentResponse response;
+    request.user = user_;
+    request.endpoint = endpoint;
+    bool ret = resman_->ThawAgent(request, &response);
+    if (ret) {
+        printf("Thaw agent %s success\n", endpoint.c_str());
+    } else {
+        printf("Thaw agent %s failed for reason %s:%s\n", endpoint.c_str(),
+                StringStatus(response.error_code.status).c_str(), response.error_code.reason.c_str());
+    }
+    return ret;
+}
+
+bool ResAction::RemoveTagsFromAgent(const std::string& endpoint, const std::string& tags_str) {
+    if (endpoint.empty()) {
+        fprintf(stderr, "endpoint is needed\n");
+        return false;
+    }
+
+    if (tags_str.empty()) {
+        fprintf(stderr, "tags is needed\n");
+        return false;
+    }
+
+    if (!this->Init()) {
+        return false;
+    }
+
+    std::set<std::string> tags;
+    boost::split(tags,
+                 tags_str,
+                 boost::is_any_of(","),
+                 boost::token_compress_on);
+    baidu::galaxy::sdk::RemoveTagsFromAgentRequest request;
+    baidu::galaxy::sdk::RemoveTagsFromAgentResponse response;
+    request.user = user_;
+    request.endpoint = endpoint;
+    request.tags.swap(tags);
+    bool ret = resman_->RemoveTagsFromAgent(request, &response);
+    if (ret) {
+        printf("Remove tags from agent %s success\n", endpoint.c_str());
+    } else {
+        printf("Remove tags from agent %s failed for reason %s:%s\n", endpoint.c_str(),
+                StringStatus(response.error_code.status).c_str(), response.error_code.reason.c_str());
+    }
+
     return ret;
 }
 

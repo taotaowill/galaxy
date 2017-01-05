@@ -43,6 +43,7 @@ public:
     bool ShowJob(const ShowJobRequest& request, ShowJobResponse* response);
     bool RecoverInstance(const RecoverInstanceRequest& request, RecoverInstanceResponse* response);
     bool ExecuteCmd(const ExecuteCmdRequest& request, ExecuteCmdResponse* response);
+    bool ManualOperate(const ManualOperateRequest& request, ManualOperateResponse* response);
 private:
     ::galaxy::ins::sdk::InsSDK* nexus_;
     ::baidu::galaxy::RpcClient* rpc_client_;
@@ -413,6 +414,45 @@ bool AppMasterImpl::ExecuteCmd(const ExecuteCmdRequest& request, ExecuteCmdRespo
     bool ok = rpc_client_->SendRequest(appmaster_stub_,
                                         &::baidu::galaxy::proto::AppMaster_Stub::ExecuteCmd,
                                         &pb_request, &pb_response, 5, 1);
+    if (!ok) {
+        response->error_code.reason = "AppMaster Rpc SendRequest failed";
+        return false;
+    }
+
+    response->error_code.status = (Status)pb_response.error_code().status();
+    response->error_code.reason = pb_response.error_code().reason();
+    if (response->error_code.status != kOk) {
+        return false;
+    }
+
+    return true;
+}
+
+bool AppMasterImpl::ManualOperate(const ManualOperateRequest& request, ManualOperateResponse* response) {
+    ::baidu::galaxy::proto::ManualOperateRequest pb_request;
+    ::baidu::galaxy::proto::ManualOperateResponse pb_response;
+
+    if (!FillUser(request.user, pb_request.mutable_user())) {
+        return false;
+    }
+
+    std::string jobid = Strim(request.jobid);
+    if (jobid.empty()) {
+        fprintf(stderr, "jobid must not be empty\n");
+        return false;
+    }
+    pb_request.set_jobid(jobid);
+
+    std::string podid = Strim(request.podid);
+    if (podid.empty()) {
+        fprintf(stderr, "podid must not be empty\n");
+        return false;
+    }
+    pb_request.set_podid(podid);
+    pb_request.set_action((proto::ForceAction)request.action);
+    bool ok = rpc_client_->SendRequest(appmaster_stub_,
+                                       &::baidu::galaxy::proto::AppMaster_Stub::ManualOperate,
+                                       &pb_request, &pb_response, 5, 1);
     if (!ok) {
         response->error_code.reason = "AppMaster Rpc SendRequest failed";
         return false;

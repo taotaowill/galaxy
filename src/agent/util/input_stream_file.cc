@@ -9,6 +9,7 @@
 namespace baidu {
 namespace galaxy {
 namespace file {
+
 InputStreamFile::InputStreamFile(const std::string& path) :
     path_(path),
     errno_(0),
@@ -46,14 +47,24 @@ baidu::galaxy::util::ErrorCode InputStreamFile::ReadLine(std::string& line) {
     ssize_t rsize = getline(&buf, &size, file_);
 
     if (rsize == -1 && !feof(file_)) {
+        if (buf) {
+            free(buf);
+            buf = NULL;
+        }
         return PERRORCODE(-1, errno_, "get line failed");
     } else if (feof(file_)) {
+        if (buf) {
+            free(buf);
+            buf = NULL;
+        }
         return ERRORCODE_OK;
     }
 
     line.assign(buf, rsize);
-    free(buf);
-    buf = NULL;
+    if (buf) {
+        free(buf);
+        buf = NULL;
+    }
     return ERRORCODE_OK;
 }
 
@@ -70,6 +81,7 @@ baidu::galaxy::util::ErrorCode InputStreamFile::Read(void* buf, size_t& size) {
 
     return ERRORCODE_OK;
 }
+
 }
 }
 }

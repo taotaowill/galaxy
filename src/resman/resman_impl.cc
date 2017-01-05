@@ -15,6 +15,8 @@
 #include <boost/function.hpp>
 #include <boost/scoped_ptr.hpp>
 
+#include "event_log.h"
+
 DECLARE_string(nexus_root);
 DECLARE_string(nexus_addr);
 DECLARE_int32(agent_timeout);
@@ -156,7 +158,6 @@ void ResManImpl::OnRMLockChange(const ::galaxy::ins::sdk::WatchParam& param,
     rm->OnLockChange(param.value);
 }
 
-
 void ResManImpl::OnLockChange(std::string lock_session_id) {
     std::string self_session_id = nexus_->GetSessionID();
     if (self_session_id != lock_session_id) {
@@ -174,6 +175,11 @@ void ResManImpl::EnterSafeMode(::google::protobuf::RpcController* controller,
         force_safe_mode_ = true;
         scheduler_->Stop();
         response->mutable_error_code()->set_status(proto::kOk);
+        EventLog ev("cluster");
+        LOG(ERROR) << ev
+            .AppendTime("time").Append("action", "enter_safe_mode")
+            .Append("detail", "cluster enter safe mode by manual")
+            .ToString();
     } else {
         response->mutable_error_code()->set_status(proto::kError);
         response->mutable_error_code()->set_reason("already in safe mode");
@@ -192,6 +198,11 @@ void ResManImpl::LeaveSafeMode(::google::protobuf::RpcController* controller,
             force_safe_mode_ = false;
             scheduler_->Start();
             response->mutable_error_code()->set_status(proto::kOk);
+            EventLog ev("cluster");
+            LOG(ERROR) << ev
+                .AppendTime("time").Append("action", "leave_safe_mode")
+                .Append("detail", "cluster leave safe mode by manual")
+                .ToString();
         } else {
             response->mutable_error_code()->set_status(proto::kError);
             response->mutable_error_code()->set_reason("invalide op, cluster in auto safemode");
@@ -221,11 +232,11 @@ void ResManImpl::Status(::google::protobuf::RpcController* controller,
     int64_t total_container_groups = container_groups_.size();
     std::map<proto::VolumMedium, int64_t> volum_total;
     std::map<proto::VolumMedium, int64_t> volum_assigned;
-    std::map<proto::VolumMedium, int64_t> volum_used; 
+    std::map<proto::VolumMedium, int64_t> volum_used;
     std::map<std::string, AgentStat>::const_iterator it;
     std::map<std::string, int64_t> pool_total;
     std::map<std::string, int64_t> pool_alive;
-    for (it = agent_stats_.begin(); it != agent_stats_.end(); it ++) { 
+    for (it = agent_stats_.begin(); it != agent_stats_.end(); it ++) {
         const std::string& endpoint = it->first;
         if (agents_.find(endpoint) == agents_.end()) {
             continue;
@@ -234,7 +245,7 @@ void ResManImpl::Status(::google::protobuf::RpcController* controller,
         proto::AgentStatus agent_status = it->second.status;
         const proto::AgentInfo& agent_info = it->second.info;
         pool_total[pool_name]++;
-        if (agent_status == proto::kAgentAlive) {
+        if (agent_status == proto::kAgentAlive || agent_status == proto::kAgentFreezed) {
             alive_agents++;
             pool_alive[pool_name]++;
         } else if (agent_status == proto::kAgentDead) {
@@ -248,7 +259,7 @@ void ResManImpl::Status(::google::protobuf::RpcController* controller,
         memory_assigned += agent_info.memory_resource().assigned();
         memory_used += agent_info.memory_resource().used();
         for (int i = 0; i < agent_info.volum_resources_size(); i++) {
-            proto::VolumMedium medium = agent_info.volum_resources(i).medium(); 
+            proto::VolumMedium medium = agent_info.volum_resources(i).medium();
             const proto::Resource& vs = agent_info.volum_resources(i).volum();
             volum_total[medium] += vs.total();
             volum_assigned[medium] += vs.assigned();
@@ -300,11 +311,18 @@ void ResManImpl::QueryAgent(const std::string& agent_endpoint, bool is_first_que
     }
     AgentStat& agent = agent_it->second;
     int32_t now_tm = common::timer::now_time();
-    VLOG(10) << agent_endpoint << ",  last:" << agent.last_heartbeat_time 
+    VLOG(10) << agent_endpoint << ",  last:" << agent.last_heartbeat_time
              << ",timeout:" << FLAGS_agent_timeout
              << ",now_tm:" << now_tm;
     if (agent.last_heartbeat_time + FLAGS_agent_timeout < now_tm) {
         LOG(WARNING) << "this agent maybe dead:" << agent_endpoint;
+        if (agent.status != proto::kAgentDead) {
+            EventLog ev("agent");
+            LOG(ERROR) << ev
+                .AppendTime("time").Append("endpoint", agent_endpoint)
+                .Append("action", "dead").Append("detail", "agent heartbeat tiemout, agent dead")
+                .ToString();
+        }
         agent.status = proto::kAgentDead;
         scheduler_->RemoveAgent(agent_endpoint);
         query_pool_.DelayTask(FLAGS_agent_query_interval * 1000,
@@ -315,9 +333,9 @@ void ResManImpl::QueryAgent(const std::string& agent_endpoint, bool is_first_que
     proto::Agent_Stub* stub;
     rpc_client_.GetStub(agent_endpoint, &stub);
     boost::scoped_ptr<proto::Agent_Stub> stub_guard(stub);
-    boost::function<void (const proto::QueryRequest*, 
+    boost::function<void (const proto::QueryRequest*,
                           proto::QueryResponse*, bool, int)> callback;
-    callback = boost::bind(&ResManImpl::QueryAgentCallback, this, 
+    callback = boost::bind(&ResManImpl::QueryAgentCallback, this,
                            agent_endpoint, is_first_query,
                            _1, _2, _3, _4);
     proto::QueryRequest* request = new proto::QueryRequest();
@@ -345,7 +363,7 @@ void ResManImpl::QueryAgentCallback(std::string agent_endpoint,
     }
     if (is_first_query) {
         MutexLock lock(&mu_);
-        std::map<std::string, proto::AgentMeta>::iterator agent_it 
+        std::map<std::string, proto::AgentMeta>::iterator agent_it
             = agents_.find(agent_endpoint);
         if (agent_it == agents_.end()) {
             LOG(WARNING) << "query result for expired agent:" << agent_endpoint;
@@ -487,7 +505,15 @@ void ResManImpl::KeepAlive(::google::protobuf::RpcController* controller,
         LOG(INFO) << "first heartbeat of: " << agent_ep;
     }
     AgentStat& agent = agent_stats_[agent_ep];
-    if (agent.status != proto::kAgentOffline) {
+    if (agent.status == proto::kAgentDead) {
+        EventLog ev("agent");
+        LOG(ERROR) << ev
+            .AppendTime("time").Append("endpoint", agent_ep)
+            .Append("action", "alive").Append("status", "kOk")
+            .Append("detail", "agent alive again")
+            .ToString();
+    }
+    if (agent.status != proto::kAgentOffline && agent.status != proto::kAgentFreezed) {
         agent.status = proto::kAgentAlive;
     }
     agent.last_heartbeat_time = common::timer::now_time();
@@ -543,7 +569,7 @@ void ResManImpl::CreateContainerGroup(::google::protobuf::RpcController* control
     }
     container_group_meta.set_id(container_group_id);
     LOG(INFO) << container_group_meta.DebugString();
-    bool ret = SaveObject(sContainerGroupPrefix + "/" + container_group_id, 
+    bool ret = SaveObject(sContainerGroupPrefix + "/" + container_group_id,
                           container_group_meta);
     if (!ret) {
         proto::ErrorCode* err = response->mutable_error_code();
@@ -707,7 +733,7 @@ void ResManImpl::UpdateContainerGroup(::google::protobuf::RpcController* control
         MutexLock lock(&mu_);
         container_groups_[new_meta.id()] = new_meta;
     }
-    bool save_ok = SaveObject(sContainerGroupPrefix + "/" + new_meta.id(), 
+    bool save_ok = SaveObject(sContainerGroupPrefix + "/" + new_meta.id(),
                               new_meta);
     if (!save_ok) {
         proto::ErrorCode* err = response->mutable_error_code();
@@ -761,7 +787,7 @@ void ResManImpl::ShowContainerGroup(::google::protobuf::RpcController* controlle
     }
     response->mutable_error_code()->set_status(proto::kOk);
     VLOG(16) << "show containers:" << response->DebugString();
-    done->Run();   
+    done->Run();
 }
 
 void ResManImpl::AddAgent(::google::protobuf::RpcController* controller,
@@ -801,6 +827,12 @@ void ResManImpl::AddAgent(::google::protobuf::RpcController* controller,
             pools_[agent_meta.pool()].insert(agent_meta.endpoint());
         }
         response->mutable_error_code()->set_status(proto::kOk);
+        EventLog ev("agent");
+        LOG(ERROR) << ev
+            .AppendTime("time").Append("endpoint", agent_meta.endpoint())
+            .Append("pool", agent_meta.pool()).Append("action", "add")
+            .Append("status", "kOk").Append("detail", "add agent ok")
+            .ToString();
     }
     done->Run();
 }
@@ -842,9 +874,28 @@ void ResManImpl::RemoveAgent(::google::protobuf::RpcController* controller,
         for (tag_it = agent_tags.begin(); tag_it != agent_tags.end(); tag_it++) {
             const std::string& tag_name = *tag_it;
             tags_[tag_name].erase(endpoint);
+            // save to nexus
+            proto::TagMeta tag_meta;
+            tag_meta.set_tag(tag_name);
+            std::set<std::string>::const_iterator c_it;
+            for (c_it = tags_[tag_name].begin(); c_it != tags_[tag_name].end(); c_it++) {
+               tag_meta.add_endpoints(*c_it);
+            }
+            bool save_ok = SaveObject(sTagPrefix + "/" + tag_name, tag_meta);
+            if (!save_ok) {
+                response->mutable_error_code()->set_status(proto::kRemoveAgentFail);
+                response->mutable_error_code()->set_reason("fail to delete tag meta from nexus");
+            }
         }
+        agent_tags_.erase(endpoint);
         scheduler_->RemoveAgent(endpoint);
         response->mutable_error_code()->set_status(proto::kOk);
+        EventLog ev("agent");
+        LOG(ERROR) << ev
+            .AppendTime("time").Append("endpoint", endpoint)
+            .Append("pool", agent_pool).Append("action", "remove")
+            .Append("status", "kOk").Append("detail", "remove agent ok")
+            .ToString();
     }
     done->Run();
 }
@@ -853,14 +904,18 @@ void ResManImpl::OnlineAgent(::google::protobuf::RpcController* controller,
                              const ::baidu::galaxy::proto::OnlineAgentRequest* request,
                              ::baidu::galaxy::proto::OnlineAgentResponse* response,
                              ::google::protobuf::Closure* done) {
-
+    response->mutable_error_code()->set_status(proto::kError);
+    response->mutable_error_code()->set_reason("not implement yet");
+    done->Run();
 }
 
 void ResManImpl::OfflineAgent(::google::protobuf::RpcController* controller,
                               const ::baidu::galaxy::proto::OfflineAgentRequest* request,
                               ::baidu::galaxy::proto::OfflineAgentResponse* response,
                               ::google::protobuf::Closure* done) {
-
+    response->mutable_error_code()->set_status(proto::kError);
+    response->mutable_error_code()->set_reason("not implement yet");
+    done->Run();
 }
 
 void ResManImpl::ListAgents(::google::protobuf::RpcController* controller,
@@ -1089,7 +1144,9 @@ void ResManImpl::RemoveAgentFromPool(::google::protobuf::RpcController* controll
                                      const ::baidu::galaxy::proto::RemoveAgentFromPoolRequest* request,
                                      ::baidu::galaxy::proto::RemoveAgentFromPoolResponse* response,
                                      ::google::protobuf::Closure* done) {
-
+    response->mutable_error_code()->set_status(proto::kError);
+    response->mutable_error_code()->set_reason("not implement yet");
+    done->Run();
 }
 
 void ResManImpl::ListAgentsByPool(::google::protobuf::RpcController* controller,
@@ -1384,7 +1441,7 @@ bool ResManImpl::RemoveObject(const std::string& key) {
     return ret;
 }
 
-template <class ProtoClass> 
+template <class ProtoClass>
 bool ResManImpl::SaveObject(const std::string& key,
                             const ProtoClass& obj) {
     std::string raw_buf;
@@ -1405,7 +1462,7 @@ template <class ProtoClass>
 bool ResManImpl::LoadObjects(const std::string& prefix,
                              std::map<std::string, ProtoClass>& objs) {
     std::string full_prefix = FLAGS_nexus_root + prefix;
-    ::galaxy::ins::sdk::ScanResult* result  
+    ::galaxy::ins::sdk::ScanResult* result
         = nexus_->Scan(full_prefix + "/", full_prefix + "/\xff");
     boost::scoped_ptr< ::galaxy::ins::sdk::ScanResult > result_guard(result);
     size_t prefix_len = full_prefix.size() + 1;
@@ -1434,11 +1491,11 @@ void ResManImpl::CreateContainerCallback(std::string agent_endpoint,
     VLOG(10) << "create response:" << response->DebugString();
     if (fail) {
         LOG(WARNING) << "rpc fail of creating container, err: " << err
-                     << ", agent: " << agent_endpoint; 
+                     << ", agent: " << agent_endpoint;
         return;
     }
     if (response->code().status() != proto::kOk) {
-        LOG(WARNING) << "fail to create contaienr, reason:" 
+        LOG(WARNING) << "fail to create contaienr, reason:"
                      << response->code().reason()
                      << ", agent:" << agent_endpoint
                      << ", contaienr_id: " << request->id();
@@ -1462,7 +1519,7 @@ void ResManImpl::RemoveContainerCallback(std::string agent_endpoint,
         return;
     }
     if (response->code().status() != proto::kOk) {
-        LOG(WARNING) << "fail to remove contaienr, reason:" 
+        LOG(WARNING) << "fail to remove contaienr, reason:"
                      << response->code().reason()
                      << ", agent:" << agent_endpoint
                      << ", container:" << request->id();
@@ -1471,7 +1528,7 @@ void ResManImpl::RemoveContainerCallback(std::string agent_endpoint,
 }
 
 template <class RpcRequest, class RpcResponse, class DoneClosure>
-bool ResManImpl::CheckUserExist(const RpcRequest* request, 
+bool ResManImpl::CheckUserExist(const RpcRequest* request,
                                 RpcResponse* response,
                                 DoneClosure* done) {
     MutexLock lock(&mu_);
@@ -1524,7 +1581,7 @@ void ResManImpl::Preempt(::google::protobuf::RpcController* controller,
     LOG(INFO) << "preempt scheduling: " << container_group_id
               << " on:" << agent_endpoint;
     std::string fail_reason;
-    bool ret = scheduler_->ManualSchedule(agent_endpoint, 
+    bool ret = scheduler_->ManualSchedule(agent_endpoint,
                                           container_group_id,
                                           fail_reason);
     if (!ret) {
@@ -1532,6 +1589,68 @@ void ResManImpl::Preempt(::google::protobuf::RpcController* controller,
         response->mutable_error_code()->set_reason(fail_reason);
     } else {
         response->mutable_error_code()->set_status(proto::kOk);
+    }
+    done->Run();
+}
+
+void ResManImpl::FreezeAgent(::google::protobuf::RpcController* controller,
+                             const ::baidu::galaxy::proto::FreezeAgentRequest* request,
+                             ::baidu::galaxy::proto::FreezeAgentResponse* response,
+                             ::google::protobuf::Closure* done) {
+    MutexLock lock(&mu_);
+    const std::string& endpoint = request->endpoint();
+    LOG(INFO) << "freeze agent: " << endpoint;
+    bool ret = true;
+    std::map<std::string, AgentStat>::iterator it = agent_stats_.find(endpoint);
+    if (it == agent_stats_.end()) {
+        ret = false;
+    } else {
+        ret = scheduler_->FreezeAgent(endpoint);
+    }
+    if (!ret) {
+        response->mutable_error_code()->set_status(proto::kError);
+        response->mutable_error_code()->set_reason("no such agent");
+    } else {
+        it->second.status = proto::kAgentFreezed;
+        response->mutable_error_code()->set_status(proto::kOk);
+        EventLog ev("agent");
+        LOG(ERROR) << ev
+            .AppendTime("time").Append("endpoint", endpoint)
+            .Append("action", "freeze").Append("status", "kOk")
+            .Append("detail", "freeze agent ok")
+            .ToString();
+    }
+    done->Run();
+}
+
+void ResManImpl::ThawAgent(::google::protobuf::RpcController* controller,
+                           const ::baidu::galaxy::proto::ThawAgentRequest* request,
+                           ::baidu::galaxy::proto::ThawAgentResponse* response,
+                           ::google::protobuf::Closure* done) {
+    MutexLock lock(&mu_);
+    const std::string& endpoint = request->endpoint();
+    LOG(INFO) << "thaw agent: " << endpoint;
+    bool ret = true;
+    std::map<std::string, AgentStat>::iterator it = agent_stats_.find(endpoint);
+    if (it == agent_stats_.end()) {
+        ret = false;
+    } else {
+        ret = scheduler_->ThawAgent(endpoint);
+    }
+    if (!ret) {
+        response->mutable_error_code()->set_status(proto::kError);
+        response->mutable_error_code()->set_reason("no such freezed agent");
+    } else {
+        if (it->second.status == proto::kAgentFreezed) {
+            it->second.status = proto::kAgentAlive;
+        }
+        response->mutable_error_code()->set_status(proto::kOk);
+        EventLog ev("agent");
+        LOG(ERROR) << ev
+            .AppendTime("time").Append("endpoint", endpoint)
+            .Append("action", "thaw").Append("status", "kOk")
+            .Append("detail", "thaw agent ok")
+            .ToString();
     }
     done->Run();
 }
@@ -1601,24 +1720,70 @@ bool ResManImpl::HasQuotaToUpdate(const std::string& user,
         - quota_removed.millicore()> quota_total.millicore()) {
         fail_reason = "no cpu quota";
         return false;
-    } else if (quota_used.memory() + quota_added.memory() 
+    } else if (quota_used.memory() + quota_added.memory()
                - quota_removed.memory() > quota_total.memory()) {
         fail_reason = "no memory quota";
         return false;
-    } else if (quota_used.disk() + quota_added.disk() 
+    } else if (quota_used.disk() + quota_added.disk()
                - quota_removed.disk() > quota_total.disk()) {
         fail_reason = "no disk quota";
         return false;
-    } else if (quota_used.ssd() + quota_added.ssd() 
+    } else if (quota_used.ssd() + quota_added.ssd()
                - quota_removed.ssd() > quota_total.ssd()) {
         fail_reason = "no ssd quota";
         return false;
-    } else if (quota_used.replica() + quota_added.replica() 
+    } else if (quota_used.replica() + quota_added.replica()
                - quota_removed.replica() > quota_total.replica()) {
         fail_reason = "no replica quota";
         return false;
     }
     return true;
+}
+
+void ResManImpl::RemoveTagsFromAgent(::google::protobuf::RpcController* controller,
+                                     const ::baidu::galaxy::proto::RemoveTagsFromAgentRequest* request,
+                                     ::baidu::galaxy::proto::RemoveTagsFromAgentResponse* response,
+                                     ::google::protobuf::Closure* done) {
+    const std::string& endpoint = request->endpoint();
+    LOG(INFO) << "remove tags from agent: " << endpoint;
+    {
+        MutexLock lock(&mu_);
+        std::map<std::string, proto::AgentMeta>::const_iterator it = agents_.find(endpoint);
+        if (it == agents_.end()) {
+            response->mutable_error_code()->set_status(proto::kRemoveAgentFail);
+            response->mutable_error_code()->set_reason("agent not exist");
+            done->Run();
+            return;
+        } else {
+            // delete agent_tags_
+            if (agent_tags_.find(endpoint) != agent_tags_.end()) {
+                for (int i = 0; i < request->tags_size(); i++) {
+                    agent_tags_[endpoint].erase(request->tags(i));
+                }
+            }
+
+            // delete tags_, save to nexus
+            for (int i = 0; i < request->tags_size(); i++) {
+                scheduler_->RemoveTag(endpoint, request->tags(i));
+                const std::string& tag_name = request->tags(i);
+                tags_[tag_name].erase(endpoint);
+                proto::TagMeta tag_meta;
+                tag_meta.set_tag(tag_name);
+                std::set<std::string>::const_iterator c_it;
+                for (c_it = tags_[tag_name].begin(); c_it != tags_[tag_name].end(); c_it++) {
+                   tag_meta.add_endpoints(*c_it);
+                }
+                bool save_ok = SaveObject(sTagPrefix + "/" + tag_name, tag_meta);
+                if (!save_ok) {
+                    response->mutable_error_code()->set_status(proto::kRemoveAgentFail);
+                    response->mutable_error_code()->set_reason("fail to save tag meta from nexus");
+                }
+            }
+        }
+    }
+
+    response->mutable_error_code()->set_status(proto::kOk);
+    done->Run();
 }
 
 } //namespace galaxy

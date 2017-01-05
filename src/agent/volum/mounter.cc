@@ -44,7 +44,7 @@ baidu::galaxy::util::ErrorCode MountProc(const std::string& source, const std::s
     }
 
     if (0 != ::mount(source.c_str(), target.c_str(), "proc", 0, NULL)) {
-        return PERRORCODE(-1, errno, "mount %s->%s failed", 
+        return PERRORCODE(-1, errno, "mount %s->%s failed",
                     source.c_str(),
                     target.c_str());
     }
@@ -119,7 +119,10 @@ baidu::galaxy::util::ErrorCode Umount(const std::string& target_path) {
         return ERRORCODE_OK;
     }
 
-    //int n = 0;
+    // fuser -m /path -k
+    std::string fuser_cmd = "fuser -m " + target_path + " -k";
+    system(fuser_cmd.c_str());
+
     if (0 != ::umount2(target_path.c_str(), MNT_FORCE)) {
         return PERRORCODE(-1, errno, "umount path %s failed", target_path.c_str());
     }
@@ -160,8 +163,7 @@ baidu::galaxy::util::ErrorCode ListMounters(std::map<std::string, boost::shared_
                 filesystem,
                 option,
                 t1,
-                t2
-                                                )) {
+                t2)) {
             continue;
         }
 

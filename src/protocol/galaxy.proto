@@ -111,6 +111,7 @@ message CpuRequired {
 message MemoryRequired {
     optional int64 size = 1;
     optional bool excess = 2;
+    optional bool use_galaxy_killer = 3;
 }
 
 message TcpthrotRequired {
@@ -133,7 +134,7 @@ message PortRequired {
 }
 
 enum VolumType {
-    kEmptyDir = 1;  
+    kEmptyDir = 1;
     kHostDir = 2;
 }
 
@@ -142,11 +143,12 @@ message VolumRequired {
     optional VolumType type = 2;
     optional VolumMedium medium = 3;
     optional string source_path = 4;  // bind source_path --> dest_path
-    optional string dest_path = 5;    
+    optional string dest_path = 5;
     optional bool readonly = 6;       // default: false
     optional bool exclusive = 7;      // default: false
     optional bool use_symlink = 8;    // use symlink or not, workspace dir use symlink default
     optional bool origin = 9 [default = false];    // use origin disk, default is false
+    optional bool preserved = 10 [default = true]; // preserved on updating, default is true
 }
 
 /////////////////////////////////////////
@@ -159,7 +161,7 @@ enum JobType {
     kJobBestEffort = 300;
 }
 
-// update incrementally may cause new problems: version confusion 
+// update incrementally may cause new problems: version confusion
 // Appmaster must save descrition of last 2 versions, and  a complete desc.
 enum JobStatus {
    kJobPending = 1;
@@ -265,6 +267,7 @@ message Deploy {
     optional string tag = 5;
     repeated string pools = 6;
     optional uint32 update_break_count = 7;
+    optional int32 stop_timeout = 8;
 }
 
 message Service {
@@ -364,7 +367,7 @@ message ContainerDescription {
     optional int32 max_per_host = 8;
     optional string tag = 9;
     repeated string pool_names = 10;
-    repeated string volum_jobs = 11; // set by user: dependent volum jobs' id 
+    repeated string volum_jobs = 11; // set by user: dependent volum jobs' id
     repeated string volum_containers = 12; //set by Resman
     optional ContainerType container_type = 13 [default = kNormalContainer];
     optional bool v2_support = 14 [default = false];
@@ -383,11 +386,11 @@ message ContainerMeta {
 
 enum ContainerStatus {
     kContainerPending = 1;     // in pending queue
-    kContainerAllocating = 2;   // 
-    kContainerReady = 3;       // ready, no process in container 
+    kContainerAllocating = 2;   //
+    kContainerReady = 3;       // ready, no process in container
     kContainerFinish = 4;      // finish , when appworker exit with code 0
     kContainerError = 5;       // an error occure
-    kContainerDestroying = 6;  // 
+    kContainerDestroying = 6;  //
     kContainerTerminated = 7;  // released by resource manager
 }
 
@@ -447,6 +450,10 @@ enum Status {
    kQuit = 22;
    kPodNotFound = 23;
    kUserNotMatch = 24;
+   kManualRebuild = 25;
+   kManualReload = 26;
+   kManualTerminate = 27;
+   kManualQuit = 28;
 }
 
 message ErrorCode {
@@ -459,6 +466,7 @@ enum AgentStatus {
     kAgentAlive = 1;
     kAgentDead = 2;
     kAgentOffline = 3;
+    kAgentFreezed = 4;
 }
 
 // agent -> resource manager
@@ -526,7 +534,7 @@ message UserMeta {
 message ContainerGroupMeta {
     optional string id = 1;
     optional string name = 2;
-    optional string user_name = 3; 
+    optional string user_name = 3;
     optional uint32 replica = 4;
     optional uint32 update_interval = 5;
     optional ContainerDescription desc = 6;

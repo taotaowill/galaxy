@@ -38,8 +38,10 @@ const std::string kGalaxyUsage = "galaxy_res_client.\n"
                                  "      galaxy_res_client remove_agent -e endpoint\n"
                                  "      galaxy_res_client list_agents [-p pool -t tag -o cpu,mem,volums]\n"
                                  "      galaxy_res_client online_agent -e endpoint\n"
-                                 "      galaxy_res_client offline_agent -e endpoint\n\n"
-                                 "      galaxy_res_client preempt -i container_group_id -e endpoint\n\n"
+                                 "      galaxy_res_client offline_agent -e endpoint\n"
+                                 "      galaxy_res_client preempt -i container_group_id -e endpoint\n"
+                                 "      galaxy_res_client freeze -e endpoint\n"
+                                 "      galaxy_res_client thaw -e endpoint\n\n"
                                  "  safemode usage:\n"
                                  "      galaxy_res_client enter_safemode\n"
                                  "      galaxy_res_client leave_safemode\n\n"
@@ -48,6 +50,7 @@ const std::string kGalaxyUsage = "galaxy_res_client.\n"
                                  "  tag usage:\n"
                                  "      galaxy_res_client create_tag -t tag -f endpoint_file\n"
                                  "      galaxy_res_client list_tags [-e endpoint]\n"
+                                 "      galaxy_res_client remove_tags -e endpoint -t tag\n\n"
                                  "  pool usage:\n"
                                  "      galaxy_res_client list_pools -e endpoint\n\n"
                                  "  user usage:\n"
@@ -55,10 +58,10 @@ const std::string kGalaxyUsage = "galaxy_res_client.\n"
                                  "      galaxy_res_client remove_user -u user\n"
                                  "      galaxy_res_client list_users\n"
                                  "      galaxy_res_client show_user -u user\n"
-                                 "      galaxy_res_client grant_user -u user -p pool -o [add|remove|set|clear]\n" 
+                                 "      galaxy_res_client grant_user -u user -p pool -o [add|remove|set|clear]\n"
                                  "                                   -a [create_container,remove_container,update_container,\n"
                                  "                                   list_containers,submit_job,remove_job,update_job,list_jobs] \n"
-                                 "      galaxy_res_client assign_quota -u user -c millicores -d disk_size -s ssd_size -m memory_size -r replica\n"
+                                 "      galaxy_res_client assign_quota -u user -c millicores -d disk_size -s ssd_size -m memory_size -r replica\n\n"
                                  "Options: \n"
                                  "      -f specify config file, job config file or label config file.\n"
                                  "      -i specify container id.\n"
@@ -105,7 +108,7 @@ int main(int argc, char** argv) {
             uint32_t length = strlen(strcpy(temp, *it));
             if (length != strlen(*it)) {
                 fprintf(stderr, "params copy error\n");
-                return -1; 
+                return -1;
             }
             new_argv[i] = temp;
         }
@@ -122,7 +125,7 @@ int main(int argc, char** argv) {
         return -1;
     }
 
-    ::baidu::galaxy::client::ResAction* resAction = new 
+    ::baidu::galaxy::client::ResAction* resAction = new
                 ::baidu::galaxy::client::ResAction();
     if (strcmp(argv[1], "create_container") == 0) {
         if (FLAGS_f.empty()) {
@@ -138,7 +141,7 @@ int main(int argc, char** argv) {
             fprintf(stderr, "-f is needed\n");
             return -1;
         }
-        
+
         if (FLAGS_i.empty()) {
             fprintf(stderr, "-i is needed\n");
             return -1;
@@ -174,7 +177,7 @@ int main(int argc, char** argv) {
             return -1;
         }
         ok =  resAction->AddAgent(FLAGS_p, FLAGS_e);
-    } else if (strcmp(argv[1], "set_agent") == 0) { 
+    } else if (strcmp(argv[1], "set_agent") == 0) {
         //已有agent,重置pool
         if (FLAGS_p.empty()) {
             fprintf(stderr, "-p is needed\n");
@@ -185,7 +188,7 @@ int main(int argc, char** argv) {
             return -1;
         }
         ok =  resAction->AddAgentToPool(FLAGS_e, FLAGS_p);
-    } else if (strcmp(argv[1], "show_agent") == 0) { 
+    } else if (strcmp(argv[1], "show_agent") == 0) {
         if (FLAGS_e.empty()) {
             fprintf(stderr, "-e is needed\n");
             return -1;
@@ -205,7 +208,7 @@ int main(int argc, char** argv) {
         } else {
             ok = resAction->ListAgents(FLAGS_o);
         }
-    } else if (strcmp(argv[1], "enter_safemode") == 0) { 
+    } else if (strcmp(argv[1], "enter_safemode") == 0) {
         ok =  resAction->EnterSafeMode();
     } else if (strcmp(argv[1], "leave_safemode") == 0) {
         ok = resAction->LeaveSafeMode();
@@ -232,9 +235,27 @@ int main(int argc, char** argv) {
             return -1;
         }
         ok = resAction->Preempt(FLAGS_i, FLAGS_e);
+    } else if (strcmp(argv[1], "freeze") == 0) {
+        if (FLAGS_e.empty()) {
+            fprintf(stderr, "-e is needed\n");
+        }
+        ok = resAction->FreezeAgent(FLAGS_e);
+    } else if (strcmp(argv[1], "thaw") == 0) {
+        if (FLAGS_e.empty()) {
+            fprintf(stderr, "-e is needed\n");
+        }
+        ok = resAction->ThawAgent(FLAGS_e);
+    } else if (strcmp(argv[1], "remove_tags") == 0) {
+        if (FLAGS_e.empty()) {
+            fprintf(stderr, "-e is needed\n");
+        }
+        if (FLAGS_t.empty()) {
+            fprintf(stderr, "-t is needed\n");
+        }
+        ok = resAction->RemoveTagsFromAgent(FLAGS_e, FLAGS_t);
     } else if (strcmp(argv[1], "status") == 0) {
         ok = resAction->Status();
-    } else if (strcmp(argv[1], "create_tag") == 0) { 
+    } else if (strcmp(argv[1], "create_tag") == 0) {
         if (FLAGS_t.empty() || FLAGS_f.empty()) {
             fprintf(stderr, "-t and -f needed\n");
             return -1;
@@ -252,13 +273,13 @@ int main(int argc, char** argv) {
             return -1;
         }
         ok = resAction->GetPoolByAgent(FLAGS_e);
-    } else if (strcmp(argv[1], "add_user") == 0) { 
+    } else if (strcmp(argv[1], "add_user") == 0) {
         if (FLAGS_u.empty() || FLAGS_t.empty()) {
             fprintf(stderr, "-u and -t are needed\n");
             return -1;
         }
         ok = resAction->AddUser(FLAGS_u, FLAGS_t);
-    } else if (strcmp(argv[1], "remove_user") == 0) { 
+    } else if (strcmp(argv[1], "remove_user") == 0) {
         if (FLAGS_u.empty()) {
             fprintf(stderr, "-u are needed\n");
             return -1;
@@ -277,7 +298,7 @@ int main(int argc, char** argv) {
             fprintf(stderr, "-u, -p are needed\n");
             return -1;
         }
-        
+
         if (FLAGS_a.empty() || FLAGS_o.empty()) {
             fprintf(stderr, "-a and -o are needed\n");
             return -1;

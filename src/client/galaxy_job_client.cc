@@ -33,6 +33,7 @@ const std::string kGalaxyUsage = "galaxy_client.\n"
                                  "      galaxy_client recover -i id [-I podid]\n"
                                  "      galaxy_client exec -i id -c cmd\n"
                                  "      galaxy_client json [-i jobid -n jobname -t num_task -d num_data_volums -p num_port -a num_packages in data_package -s num_service]\n"
+                                 "      galaxy_client operate -i jobid -I podid -o operation\n"
                                  "Options: \n"
                                  "      -f specify config file, job config file or label config file.\n"
                                  "      -c specify cmd.\n"
@@ -162,6 +163,16 @@ int main(int argc, char** argv) {
         } else {
             ok = jobAction->GenerateJson(FLAGS_i);
         }
+    } else if (strcmp(argv[1], "operate") == 0) {
+        if (FLAGS_i.empty()) {
+            fprintf(stderr, "-i is needed\n");
+            return -1;
+        }
+        if (FLAGS_I.empty()) {
+            fprintf(stderr, "-I is needed\n");
+            return -1;
+        }
+        ok = jobAction->OperatePod(FLAGS_i, FLAGS_I, FLAGS_o);
     } else {
         fprintf(stderr, "%s", kGalaxyUsage.c_str());
         return -1;

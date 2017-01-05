@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 #include <boost/bind.hpp>
-#include "curl/curl.h"
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 #include <sstream>

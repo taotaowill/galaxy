@@ -20,14 +20,15 @@ void SetupLog(const std::string& name) {
     }
     std::string log_filename = FLAGS_log_dir + "/" + program_name + ".INFO.";
     std::string wf_filename = FLAGS_log_dir + "/" + program_name + ".WARNING.";
+    std::string ev_filename = FLAGS_log_dir + "/" + program_name + ".EVENT.";
     google::SetLogDestination(google::INFO, log_filename.c_str());
     google::SetLogDestination(google::WARNING, wf_filename.c_str());
-    google::SetLogDestination(google::ERROR, "");
+    google::SetLogDestination(google::ERROR, ev_filename.c_str());
     google::SetLogDestination(google::FATAL, "");
 
     google::SetLogSymlink(google::INFO, program_name.c_str());
     google::SetLogSymlink(google::WARNING, program_name.c_str());
-    google::SetLogSymlink(google::ERROR, "");
+    google::SetLogSymlink(google::ERROR,  program_name.c_str());
     google::SetLogSymlink(google::FATAL, "");
     google::InstallFailureSignalHandler();
 }

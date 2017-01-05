@@ -328,6 +328,54 @@ std::string StringStatus(const ::baidu::galaxy::sdk::Status& status) {
     case ::baidu::galaxy::sdk::kAddAgentToPoolFail:
         result = "kAddAgentToPoolFail";
         break;
+    case ::baidu::galaxy::sdk::kAddUserFail:
+        result = "kAddUserFail";
+        break;
+    case ::baidu::galaxy::sdk::kRemoveUserFail:
+        result = "kRemoveUserFail";
+        break;
+    case ::baidu::galaxy::sdk::kGrantUserFail:
+        result = "kGrantUserFail";
+        break;
+    case ::baidu::galaxy::sdk::kAssignQuotaFail:
+        result = "kAssignQuotaFail";
+        break;
+    case ::baidu::galaxy::sdk::kRebuild:
+        result = "kRebuild";
+        break;
+    case ::baidu::galaxy::sdk::kReload:
+        result = "kReload";
+        break;
+    case ::baidu::galaxy::sdk::kStatusConflict:
+        result = "kStatusConflict";
+        break;
+    case ::baidu::galaxy::sdk::kJobTerminateFail:
+        result = "kJobTerminateFail";
+        break;
+    case ::baidu::galaxy::sdk::kSuspend:
+        result = "kSuspend";
+        break;
+    case ::baidu::galaxy::sdk::kQuit:
+        result = "kQuit";
+        break;
+    case ::baidu::galaxy::sdk::kPodNotFound:
+        result = "kPodNotFound";
+        break;
+    case ::baidu::galaxy::sdk::kUserNotMatch:
+        result = "kUserNotMatch";
+        break;
+    case ::baidu::galaxy::sdk::kManualRebuild:
+        result = "kManualRebuild";
+        break;
+    case ::baidu::galaxy::sdk::kManualReload:
+        result = "kManualReload";
+        break;
+    case ::baidu::galaxy::sdk::kManualTerminate:
+        result = "kManualTerminate";
+        break;
+    case ::baidu::galaxy::sdk::kManualQuit:
+        result = "kManualQuit";
+        break;
     default:
         result = "";
     }
@@ -348,6 +396,9 @@ std::string StringAgentStatus(const ::baidu::galaxy::sdk::AgentStatus& status) {
         break;
     case ::baidu::galaxy::sdk::kAgentOffline:
         result = "Offline";
+        break;
+    case ::baidu::galaxy::sdk::kAgentFreezed:
+        result = "Freezed";
         break;
     default:
         result = "";
@@ -560,6 +611,7 @@ bool GenerateJson(int num_tasks, int num_data_volums, int num_ports,
     deploy.AddMember("replica", 1, allocator);
     deploy.AddMember("step", 1, allocator);
     deploy.AddMember("interval", 1, allocator);
+    deploy.AddMember("stop_timeout", 30, allocator);
     deploy.AddMember("max_per_host", 1, allocator);
     deploy.AddMember("tag", "", allocator);
     deploy.AddMember("pools", "example,test", allocator);
@@ -611,6 +663,7 @@ bool GenerateJson(int num_tasks, int num_data_volums, int num_ports,
         rapidjson::Value mem(rapidjson::kObjectType);
         mem.AddMember("size", "800M", allocator);
         mem.AddMember("excess", false, allocator);
+        mem.AddMember("use_galaxy_killer", false, allocator);
 
         rapidjson::Value tcp(rapidjson::kObjectType);
         tcp.AddMember("recv_bps_quota", "30M", allocator);
@@ -638,11 +691,11 @@ bool GenerateJson(int num_tasks, int num_data_volums, int num_ports,
         
         rapidjson::Value package(rapidjson::kObjectType);
         
-        str = "ftp://***.baidu.com/home/users/***/exec/" + ::baidu::common::NumToString(i) + "/linkbase.tar.gz";;
+        str = "ftp://hostname/path/" + ::baidu::common::NumToString(i) + "/package.tar.gz";;
         obj_str.SetString(str.c_str(), allocator);
         package.AddMember("source_path", obj_str, allocator);
 
-        str = "/home/work/exec/" + ::baidu::common::NumToString(i);
+        str = "/home/work/" + ::baidu::common::NumToString(i);
         obj_str.SetString(str.c_str(), allocator);
         package.AddMember("dest_path", obj_str, allocator);
         package.AddMember("version", "1.0.0", allocator);
@@ -656,7 +709,7 @@ bool GenerateJson(int num_tasks, int num_data_volums, int num_ports,
         rapidjson::Value data_packages(rapidjson::kArrayType);
         for (int j = 0; j < num_data_packages; ++j) {
 
-            str = "ftp://***.baidu.com/home/users/***/data/" + ::baidu::common::NumToString(i)
+            str = "ftp://hostname/path/" + ::baidu::common::NumToString(i)
                   + ::baidu::common::NumToString(j) + "/linkbase.dict.tar.gz";
             obj_str.SetString(str.c_str(), allocator);
 

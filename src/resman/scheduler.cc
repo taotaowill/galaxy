@@ -108,8 +108,9 @@ void Agent::SetReserved(int64_t cpu_reserved,
                         int64_t cpu_deep_reserved,
                         int64_t memory_reserved,
                         int64_t memory_deep_reserved) {
-    LOG(INFO)
-        << "# cpu_reserved: " << cpu_reserved
+    VLOG(10)
+        << "# agent: " << endpoint_
+        << ", cpu_reserved: " << cpu_reserved
         << ", cpu_deep_reserved: " << cpu_deep_reserved
         << ", memory_reserved: " << memory_reserved
         << ", memory_deep_reserved: " << memory_deep_reserved;
@@ -120,8 +121,8 @@ void Agent::SetReserved(int64_t cpu_reserved,
 }
 
 bool Agent::TryPut(const Container* container, ResourceError& err) {
-    LOG(INFO)
-        << "### TryPut, agent: " << endpoint_
+    VLOG(10)
+        << "# TryPut, agent: " << endpoint_
         << ", container: " << container->id
         << ", cpu[a/r/da/dr]: "
         << cpu_assigned_ << "," << cpu_reserved_ << "," << cpu_deep_assigned_ << "," << cpu_deep_reserved_
@@ -200,7 +201,7 @@ bool Agent::TryPut(const Container* container, ResourceError& err) {
         return false;
     }
 
-    if (container->require->ports.size() + port_assigned_.size() 
+    if (container->require->ports.size() + port_assigned_.size()
         > port_total_) {
         err = proto::kNoPort;
         return false;
@@ -375,7 +376,7 @@ bool Agent::SelectFreePorts(const std::vector<proto::PortRequired>& ports_need,
             }
         }
     }
-    
+
     if (has_dynamic_port &&  ((int)free_random_ports.size() != dynamic_port_count) ) {
         return false;
     }
@@ -394,7 +395,7 @@ bool Agent::SelectFreePorts(const std::vector<proto::PortRequired>& ports_need,
 
 bool Agent::SelectFreeVolumContainers(const std::vector<ContainerGroupId>& volum_jobs,
                                       std::vector<ContainerId>& volum_containers) {
-    std::map<ContainerGroupId, std::set<ContainerId> > volum_jobs_free  
+    std::map<ContainerGroupId, std::set<ContainerId> > volum_jobs_free
          = volum_jobs_free_; //copy
     for (size_t i = 0; i < volum_jobs.size(); i++) {
         const ContainerGroupId& container_group_id = volum_jobs[i];
@@ -415,7 +416,7 @@ void Agent::Evict(Container::Ptr container) {
         return;
     }
     if (container->priority != proto::kJobBestEffort) {
-        //cpu 
+        //cpu
         cpu_assigned_ -= container->require->CpuNeed();
         assert(cpu_assigned_ >= 0);
         //memory
@@ -523,7 +524,7 @@ bool Agent::RecurSelectDevices(size_t i, const std::vector<proto::VolumRequired>
         if (volum_info.medium != volum_need.medium()) {
             continue;
         }
-        if (volum_need.exclusive() && 
+        if (volum_need.exclusive() &&
             path_used.find(device_path) != path_used.end()) {
             continue;
         }
@@ -548,9 +549,13 @@ Scheduler::Scheduler() : stop_(true) {
     srand(time(NULL));
 }
 
-void Scheduler::SetRequirement(Requirement::Ptr require, 
+void Scheduler::SetRequirement(Requirement::Ptr require,
                                const proto::ContainerDescription& container_desc) {
     require->tag = container_desc.tag();
+    require->v2_support = false;
+    if (container_desc.has_v2_support() && container_desc.v2_support()) {
+        require->v2_support = true;
+    }
     for (int j = 0; j < container_desc.pool_names_size(); j++) {
         require->pool_names.insert(container_desc.pool_names(j));
     }
@@ -741,9 +746,10 @@ void Scheduler::RemoveAgent(const AgentEndpoint& endpoint) {
             } else {
                 ChangeStatus(container, kContainerPending);
             }
-        }     
+        }
     }
     agents_.erase(endpoint);
+    freezed_agents_.erase(endpoint);
 }
 
 void Scheduler::AddTag(const AgentEndpoint& endpoint, const std::string& tag) {
@@ -777,6 +783,28 @@ void Scheduler::SetPool(const AgentEndpoint& endpoint, const std::string& pool_n
     }
     Agent::Ptr agent = it->second;
     agent->pool_name_ = pool_name;
+}
+
+bool Scheduler::FreezeAgent(const AgentEndpoint& endpoint) {
+    MutexLock locker(&mu_);
+    std::map<AgentEndpoint, Agent::Ptr>::iterator it = agents_.find(endpoint);
+    if (it == agents_.end()) {
+        LOG(WARNING) << "freeze agent fail, no such agent:" << endpoint;
+        return false;
+    }
+    freezed_agents_.insert(endpoint);
+    return true;
+}
+
+bool Scheduler::ThawAgent(const AgentEndpoint& endpoint) {
+    MutexLock locker(&mu_);
+    std::set<AgentEndpoint>::iterator it = freezed_agents_.find(endpoint);
+    if (it == freezed_agents_.end()) {
+        LOG(WARNING) << "thaw agent fail, no such freezed agent:" << endpoint;
+        return false;
+    }
+    freezed_agents_.erase(it);
+    return true;
 }
 
 ContainerGroupId Scheduler::GenerateContainerGroupId(const std::string& container_group_name) {
@@ -955,7 +983,7 @@ void Scheduler::ScaleDown(ContainerGroup::Ptr container_group, int replica) {
         }
     }
     ContainerStatus all_status[] = {kContainerAllocating, kContainerReady};
-    for (size_t i = 0; i < sizeof(all_status) && delta > 0; i++) {
+    for (size_t i = 0; i < (sizeof(all_status) / sizeof(all_status[0])) && delta > 0; i++) {
         ContainerStatus st = all_status[i];
         ContainerMap working_containers = container_group->states[st];
         BOOST_FOREACH(ContainerMap::value_type& pair, working_containers) {
@@ -988,7 +1016,7 @@ void Scheduler::ScaleUp(ContainerGroup::Ptr container_group, int replica) {
             container = it->second;
         }
         if (container->status != kContainerReady && container->status != kContainerAllocating) {
-            ChangeStatus(container_group, container, kContainerPending);            
+            ChangeStatus(container_group, container, kContainerPending);
         }
     }
 }
@@ -1117,7 +1145,7 @@ bool Scheduler::CheckTagAndPoolOnce(Agent::Ptr agent, Container::Ptr container) 
         container->last_res_err = proto::kTagMismatch;
         check_passed = false;
     }
-    if (container->require->pool_names.find(agent->pool_name_) 
+    if (container->require->pool_names.find(agent->pool_name_)
         == container->require->pool_names.end()) {
         container->last_res_err = proto::kPoolMismatch;
         check_passed = false;
@@ -1177,6 +1205,12 @@ void Scheduler::ScheduleNextAgent(AgentEndpoint pre_endpoint) {
     } else {
         // turn to the start
         sched_pool_.AddTask(boost::bind(&Scheduler::ScheduleNextAgent, this, ""));
+        return;
+    }
+
+    if (freezed_agents_.find(endpoint) != freezed_agents_.end()) {
+        // turn to next available agent
+        sched_pool_.AddTask(boost::bind(&Scheduler::ScheduleNextAgent, this, endpoint));
         return;
     }
 
@@ -1256,7 +1290,7 @@ bool Scheduler::ManualSchedule(const AgentEndpoint& endpoint,
     BOOST_FOREACH(ContainerMap::value_type& pair, agent->containers_) {
         agent_containers.push_back(pair.second);
     }
-    std::sort(agent_containers.begin(), 
+    std::sort(agent_containers.begin(),
               agent_containers.end(), ContainerPriorityLess());
     std::vector<Container::Ptr>::reverse_iterator it;
     ResourceError res_err;
@@ -1303,6 +1337,9 @@ bool Scheduler::Update(const ContainerGroupId& container_group_id,
     SetRequirement(require, container_desc);
     if (!RequireHasDiff(require.get(), container_group->require.get())) {
         LOG(WARNING) << "version same, ignore updating";
+        container_group->update_interval = update_interval;
+        container_group->container_desc = container_desc;
+        container_group->update_time = common::timer::get_micros();
         return false;
     }
     new_version = GetNewVersion();
@@ -1382,16 +1419,18 @@ void Scheduler::MakeCommand(const std::string& agent_endpoint,
                 it_local->second->require->MemoryNeed());
         }
 
-        const std::string& local_version = it_local->second->require->version;
-        const std::string& remote_version = container_remote.container_desc().version();
-        if (local_version != remote_version) {
-            LOG(INFO) << "version expired:" << local_version 
-                      << " , " << remote_version << ", " << container_remote.id();
-            cmd.container_id = container_remote.id();
-            cmd.container_group_id = container_remote.group_id();
-            cmd.action = kDestroyContainer;
-            commands.push_back(cmd);
-            continue;
+        if (FLAGS_check_container_version) {
+            const std::string& local_version = it_local->second->require->version;
+            const std::string& remote_version = container_remote.container_desc().version();
+            if (local_version != remote_version) {
+                LOG(INFO) << "version expired:" << local_version
+                          << " , " << remote_version << ", " << container_remote.id();
+                cmd.container_id = container_remote.id();
+                cmd.container_group_id = container_remote.group_id();
+                cmd.action = kDestroyContainer;
+                commands.push_back(cmd);
+                continue;
+            }
         }
         remote_status[container_remote.id()] = container_remote.status();
         Container::Ptr container_local = it_local->second;
@@ -1465,7 +1504,7 @@ void Scheduler::MakeCommand(const std::string& agent_endpoint,
 
 bool Scheduler::RequireHasDiff(const Requirement* v1, const Requirement* v2) {
     mu_.AssertHeld();
-    if (v1 == v2) {//same object 
+    if (v1 == v2) {//same object
         return false;
     }
     if (v1->container_type != v2->container_type) {
@@ -1482,15 +1521,8 @@ bool Scheduler::RequireHasDiff(const Requirement* v1, const Requirement* v2) {
     if (v1->tag != v2->tag) {
         return true;
     }
-    if (v1->pool_names.size() != v2->pool_names.size()) {
+    if (v1->v2_support != v2->v2_support) {
         return true;
-    }
-    std::set<std::string>::iterator it = v1->pool_names.begin();
-    std::set<std::string>::iterator jt = v2->pool_names.begin();
-    for (; it != v1->pool_names.end() && jt != v2->pool_names.end() ; it++, jt++) {
-        if (*it != *jt) {
-            return true;
-        }
     }
     if (v1->max_per_host != v2->max_per_host) {
         return true;
@@ -1508,8 +1540,11 @@ bool Scheduler::RequireHasDiff(const Requirement* v1, const Requirement* v2) {
         return true;
     }
     for (size_t i = 0; i < v1->memory.size(); i++) {
-        if (v1->memory[i].size() != v2->memory[i].size() ||
-            v1->memory[i].excess() != v2->memory[i].excess()) {
+        bool v1_use_killer = v1->memory[i].has_use_galaxy_killer() ? v1->memory[i].use_galaxy_killer() : false;
+        bool v2_use_killer = v2->memory[i].has_use_galaxy_killer() ? v2->memory[i].use_galaxy_killer() : false;
+        if (v1->memory[i].size() != v2->memory[i].size()
+                    || v1->memory[i].excess() != v2->memory[i].excess()
+                    || v1_use_killer != v2_use_killer) {
             return true;
         }
     }
@@ -1529,7 +1564,7 @@ bool Scheduler::RequireHasDiff(const Requirement* v1, const Requirement* v2) {
         const proto::VolumRequired& vr_1 = v1->volums[i];
         const proto::VolumRequired& vr_2 = v2->volums[i];
         if (vr_1.size() != vr_2.size() || vr_1.type() != vr_2.type()
-            || vr_1.medium() != vr_2.medium() 
+            || vr_1.medium() != vr_2.medium()
             || vr_1.dest_path() != vr_2.dest_path()
             || vr_1.readonly() != vr_2.readonly()
             || vr_1.exclusive() != vr_2.exclusive()) {
@@ -1539,7 +1574,7 @@ bool Scheduler::RequireHasDiff(const Requirement* v1, const Requirement* v2) {
     for (size_t i = 0; i < v1->ports.size(); i++) {
         const proto::PortRequired& pt_1 = v1->ports[i];
         const proto::PortRequired& pt_2 = v2->ports[i];
-        if (pt_1.port() != pt_2.port() || 
+        if (pt_1.port() != pt_2.port() ||
             pt_1.port_name() != pt_2.port_name()) {
             return true;
         }
@@ -1564,7 +1599,7 @@ bool Scheduler::RequireHasDiff(const Requirement* v1, const Requirement* v2) {
     return false;
 }
 
-void Scheduler::SetVolumsAndPorts(const Container::Ptr& container, 
+void Scheduler::SetVolumsAndPorts(const Container::Ptr& container,
                                   proto::ContainerDescription& container_desc) {
     mu_.AssertHeld();
     size_t idx = 0;
@@ -1635,7 +1670,7 @@ bool Scheduler::ListContainerGroups(std::vector<proto::ContainerGroupStatistics>
             group_stat.set_status(proto::kContainerGroupNormal);
         }
         std::map<ContainerId, Container::Ptr>::iterator jt;
-        for (jt = container_group->containers.begin(); 
+        for (jt = container_group->containers.begin();
              jt != container_group->containers.end(); jt++) {
             //sum up all containers
             Container::Ptr container = jt->second;
@@ -1661,7 +1696,7 @@ bool Scheduler::ListContainerGroups(std::vector<proto::ContainerGroupStatistics>
         group_stat.mutable_cpu()->set_used(cpu_used);
         group_stat.mutable_memory()->set_assigned(memory_assigned);
         group_stat.mutable_memory()->set_used(memory_used);
-        
+
         std::map<proto::VolumMedium, int64_t>::iterator v_it;
         for (v_it = volum_assigned.begin(); v_it != volum_assigned.end(); v_it++) {
             proto::VolumResource* volum_stat = group_stat.add_volums();
@@ -1671,7 +1706,7 @@ bool Scheduler::ListContainerGroups(std::vector<proto::ContainerGroupStatistics>
             volum_stat->set_medium(medium);
             volum_stat->mutable_volum()->set_assigned(assigned_size);
             volum_stat->mutable_volum()->set_used(used_size);
-        }  
+        }
         container_groups.push_back(group_stat);
     }
     return true;
@@ -1734,7 +1769,7 @@ void Scheduler::GetContainersStatistics(const ContainerMap& containers_map,
         container_stat.mutable_cpu()->set_assigned(cpu_assigned);
         container_stat.mutable_cpu()->set_used(cpu_used);
         container_stat.mutable_memory()->set_assigned(memory_assigned);
-        container_stat.mutable_memory()->set_used(memory_used);  
+        container_stat.mutable_memory()->set_used(memory_used);
         containers.push_back(container_stat);
     }
 }
@@ -1774,7 +1809,7 @@ void Scheduler::ShowUserAlloc(const std::string& user_name, proto::Quota& alloc)
         }
         memory_alloc += container_group->require->TmpfsNeed() * replica;
         disk_alloc += container_group->require->DiskNeed() * replica;
-        ssd_alloc += container_group->require->SsdNeed() * replica;  
+        ssd_alloc += container_group->require->SsdNeed() * replica;
     }
     alloc.set_millicore(cpu_alloc);
     alloc.set_memory(memory_alloc);

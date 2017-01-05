@@ -149,7 +149,7 @@ bool JobAction::UpdateJob(const std::string& json_file, const std::string& jobid
 
     bool ret =  app_master_->UpdateJob(request, &response);
     if (ret) {
-        printf("Update job %s\n success", jobid.c_str());
+        printf("Update job %s success\n", jobid.c_str());
     } else {
         printf("Update job %s failed for reason %s:%s\n",
                 jobid.c_str(), StringStatus(response.error_code.status).c_str(), response.error_code.reason.c_str());
@@ -179,7 +179,7 @@ bool JobAction::StopJob(const std::string& jobid) {
 
     bool ret =  app_master_->StopJob(request, &response);
     if (ret) {
-        printf("Stop job %s\n success", jobid.c_str());
+        printf("Stop job %s success\n", jobid.c_str());
     } else {
         printf("Stop job %s failed for reason %s:%s\n",
                 jobid.c_str(), StringStatus(response.error_code.status).c_str(), response.error_code.reason.c_str());
@@ -1033,6 +1033,7 @@ bool JobAction::GenerateJson(const std::string& jobid) {
     deploy.AddMember("replica", job.deploy.replica, allocator);
     deploy.AddMember("step", job.deploy.step, allocator);
     deploy.AddMember("interval", job.deploy.interval, allocator);
+    deploy.AddMember("stop_timeout", job.deploy.stop_timeout, allocator);
     deploy.AddMember("max_per_host", job.deploy.max_per_host, allocator);
     obj_str.SetString(job.deploy.tag.c_str(), allocator);
     deploy.AddMember("tag", obj_str, allocator);
@@ -1111,6 +1112,7 @@ bool JobAction::GenerateJson(const std::string& jobid) {
         obj_str.SetString(StringUnit(sdk_task.memory.size).c_str(), allocator);
         mem.AddMember("size", obj_str, allocator);
         mem.AddMember("excess", sdk_task.memory.excess, allocator);
+        mem.AddMember("use_galaxy_killer", sdk_task.memory.use_galaxy_killer, allocator);
 
         rapidjson::Value tcp(rapidjson::kObjectType);
         obj_str.SetString(StringUnit(sdk_task.tcp_throt.recv_bps_quota).c_str(), allocator);
@@ -1250,6 +1252,46 @@ bool JobAction::GenerateJson(const std::string& jobid) {
     std::string str_json = buffer.GetString();
     fprintf(stdout, "%s\n", str_json.c_str());
     return true;
+}
+
+bool JobAction::OperatePod(const std::string& jobid, const std::string& podid, const std::string& action) {
+    if (jobid.empty() || podid.empty()) {
+        fprintf(stderr, "jobid and cmd are needed\n");
+        return false;
+    }
+
+    if(!this->Init()) {
+        return false;
+    }
+
+    sdk::ForceAction sdk_action;
+    if (action == "restart") {
+        sdk_action = sdk::kForceActionRebuild;
+    } else if (action == "reload") {
+        sdk_action = sdk::kForceActionReload;
+    } else if (action == "exit") {
+        sdk_action = sdk::kForceActionTerminate;
+    } else if (action == "abort") {
+        sdk_action = sdk::kForceActionQuit;
+    } else {
+        fprintf(stderr, "action is not correct\n");
+        return false;
+    }
+
+    baidu::galaxy::sdk::ManualOperateRequest request;
+    baidu::galaxy::sdk::ManualOperateResponse response;
+    request.user = user_;
+    request.jobid = jobid;
+    request.podid = podid;
+    request.action = sdk_action;
+    bool ret = app_master_->ManualOperate(request, &response);
+    if (ret) {
+        printf("%s pod %s success\n", action.c_str(), podid.c_str());
+    } else {
+        printf("%s pod %s failed for reason %s:%s\n", action.c_str(), podid.c_str(),
+                StringStatus(response.error_code.status).c_str(), response.error_code.reason.c_str());
+    }
+    return ret;
 }
 
 int JobAction::CalResPolicy(int64_t need_cpu, int64_t need_mem,

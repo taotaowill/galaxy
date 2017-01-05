@@ -49,9 +49,9 @@ bool CheckEndPoint(std::string& endpoint) {
         fprintf(stderr, "Port not correct\n");
         return false;
     }
-    endpoint = ::baidu::common::NumToString(ip_1) + "." 
-               + ::baidu::common::NumToString(ip_2) + "." 
-               + ::baidu::common::NumToString(ip_3) + "." 
+    endpoint = ::baidu::common::NumToString(ip_1) + "."
+               + ::baidu::common::NumToString(ip_2) + "."
+               + ::baidu::common::NumToString(ip_3) + "."
                + ::baidu::common::NumToString(ip_4) + ':' + port;
     return true;
 }
@@ -113,13 +113,14 @@ bool FillVolumRequired(const VolumRequired& sdk_volum, ::baidu::galaxy::proto::V
     volum->set_exclusive(sdk_volum.exclusive);
     //volum->set_use_symlink(sdk_volum.use_symlink);//暂时不支持，默认为false
     volum->set_use_symlink(false);
+    volum->set_preserved(sdk_volum.preserved);
     return true;
 }
 
-bool FillCpuRequired(const CpuRequired& sdk_cpu, 
+bool FillCpuRequired(const CpuRequired& sdk_cpu,
                         ::baidu::galaxy::proto::CpuRequired* cpu) {
-    if (sdk_cpu.milli_core <= 0) {
-        fprintf(stderr, "cpu millicores must be greater than 0\n");
+    if (sdk_cpu.milli_core < 0) {
+        fprintf(stderr, "cpu millicores must be > 0\n");
         return false;
     }
     cpu->set_milli_core(sdk_cpu.milli_core);
@@ -127,14 +128,22 @@ bool FillCpuRequired(const CpuRequired& sdk_cpu,
     return true;
 }
 
-bool FillMemRequired(const MemoryRequired& sdk_mem, 
+bool FillMemRequired(const MemoryRequired& sdk_mem,
                         ::baidu::galaxy::proto::MemoryRequired* mem) {
     if (sdk_mem.size <= 0) {
         fprintf(stderr, "memory size must be greater than 0\n");
         return false;
     }
+
+    if (sdk_mem.excess && sdk_mem.use_galaxy_killer) {
+        fprintf(stderr, "mem.excess and mem.use_galaxy_killer cannot be true at the same time");
+        return false;
+    }
+
     mem->set_size(sdk_mem.size);
     mem->set_excess(sdk_mem.excess);
+    mem->set_use_galaxy_killer(sdk_mem.use_galaxy_killer);
+
     return true;
 }
 
@@ -214,13 +223,13 @@ bool FillPortRequired(const PortRequired& sdk_port, ::baidu::galaxy::proto::Port
     return true;
 }
 
-bool FillCgroup(const Cgroup& sdk_cgroup, 
-                ::baidu::galaxy::proto::Cgroup* cgroup,  
+bool FillCgroup(const Cgroup& sdk_cgroup,
+                ::baidu::galaxy::proto::Cgroup* cgroup,
                 std::vector<std::string>& vec_cgroups_ports) {
 
     std::vector<std::string> vec_port_names;
     std::vector<std::string> vec_ports;
-    
+
     if (!FillCpuRequired(sdk_cgroup.cpu, cgroup->mutable_cpu())) {
         return false;
     }
@@ -228,11 +237,11 @@ bool FillCgroup(const Cgroup& sdk_cgroup,
     if (!FillMemRequired(sdk_cgroup.memory, cgroup->mutable_memory())) {
         return false;
     }
-    
+
     if (!FillTcpthrotRequired(sdk_cgroup.tcp_throt, cgroup->mutable_tcp_throt())) {
         return false;
     }
-    
+
     if (!FillBlkioRequired(sdk_cgroup.blkio, cgroup->mutable_blkio())) {
         return false;
     }
@@ -245,8 +254,8 @@ bool FillCgroup(const Cgroup& sdk_cgroup,
             break;
         }
 
-        std::vector<std::string> ::iterator it = find(vec_port_names.begin(), 
-                                                      vec_port_names.end(), 
+        std::vector<std::string> ::iterator it = find(vec_port_names.begin(),
+                                                      vec_port_names.end(),
                                                       Strim(sdk_cgroup.ports[i].port_name));
         if (it != vec_port_names.end()) {
             fprintf(stderr, "port_name in ports cannot be repeated\n");
@@ -276,7 +285,7 @@ bool FillCgroup(const Cgroup& sdk_cgroup,
     return ok;
 }
 
-bool FillContainerDescription(const ContainerDescription& sdk_container, 
+bool FillContainerDescription(const ContainerDescription& sdk_container,
                                 ::baidu::galaxy::proto::ContainerDescription* container) {
 
     if (sdk_container.priority == kJobMonitor) {
@@ -297,7 +306,7 @@ bool FillContainerDescription(const ContainerDescription& sdk_container,
         fprintf(stderr, "run_user must not be empty\n");
         return false;
     }
-    
+
     //container->set_run_user(run_user);
     container->set_run_user("galaxy");
     /*if (sdk_container.version.empty()) {
@@ -346,7 +355,7 @@ bool FillContainerDescription(const ContainerDescription& sdk_container,
         fprintf(stderr, "container type must be kVolumContainer or kNormalContainer\n");
         return false;
     }
-    
+
     if (!FillVolumRequired(sdk_container.workspace_volum, container->mutable_workspace_volum())) {
         return false;
     }
@@ -362,8 +371,8 @@ bool FillContainerDescription(const ContainerDescription& sdk_container,
             break;
         }
         //重复值检测
-        std::vector<std::string> ::iterator it = find(vec_des_path.begin(), 
-                                                      vec_des_path.end(), 
+        std::vector<std::string> ::iterator it = find(vec_des_path.begin(),
+                                                      vec_des_path.end(),
                                                       Strim(sdk_container.data_volums[i].dest_path));
         if (it != vec_des_path.end()) {
             fprintf(stderr, "dest_path in volums cannot be repeated\n");
@@ -395,7 +404,7 @@ bool FillContainerDescription(const ContainerDescription& sdk_container,
         }
         cgroup->set_id(::baidu::common::NumToString(i));
     }
-    
+
     return ok;
 }
 
@@ -423,7 +432,7 @@ bool FillPackage(const Package& sdk_package, ::baidu::galaxy::proto::Package* pa
     return true;
 }
 
-bool FillImagePackage(const ImagePackage& sdk_image, 
+bool FillImagePackage(const ImagePackage& sdk_image,
                         ::baidu::galaxy::proto::ImagePackage* image) {
     std::string start_cmd = Strim(sdk_image.start_cmd);
     if (start_cmd.empty()) {
@@ -457,7 +466,7 @@ bool FilldataPackage(const DataPackage& sdk_data, ::baidu::galaxy::proto::DataPa
     return ok;
 }
 
-bool FillService(const Service& sdk_service, 
+bool FillService(const Service& sdk_service,
                  ::baidu::galaxy::proto::Service* service) {
     std::string service_name = Strim(sdk_service.service_name);
     if (service_name.empty()) {
@@ -466,7 +475,7 @@ bool FillService(const Service& sdk_service,
     }
 
     service->set_service_name(service_name);
-    
+
     /*if (sdk_service.port_name.empty()) {
         fprintf(stderr, "service port_name must not be empty\n");
         return false;
@@ -475,7 +484,7 @@ bool FillService(const Service& sdk_service,
     std::string token = Strim(sdk_service.token);
     if (sdk_service.use_bns && token.empty()) {
         fprintf(stderr, "service token must not be empty\n");
-        return false; 
+        return false;
     }
 
     service->set_port_name(Strim(sdk_service.port_name));
@@ -492,7 +501,7 @@ bool FillTaskDescription(const TaskDescription& sdk_task,
         ::baidu::galaxy::proto::TaskDescription* task,
         std::vector<std::string>& vec_tasks_ports,
         std::vector<std::string>& vec_service_names) {
-    
+
     std::vector<std::string> vec_port_names;
     std::vector<std::string> vec_ports;
     bool ok = true;
@@ -512,8 +521,8 @@ bool FillTaskDescription(const TaskDescription& sdk_task,
             break;
         }
 
-        std::vector<std::string> ::iterator it = find(vec_port_names.begin(), 
-                                                      vec_port_names.end(), 
+        std::vector<std::string> ::iterator it = find(vec_port_names.begin(),
+                                                      vec_port_names.end(),
                                                       Strim(sdk_task.ports[i].port_name));
         if (it != vec_port_names.end()) {
             fprintf(stderr, "port_name in ports cannot be repeated\n");
@@ -522,7 +531,7 @@ bool FillTaskDescription(const TaskDescription& sdk_task,
         }
         vec_port_names.push_back(Strim(sdk_task.ports[i].port_name));
         vec_task_port_names.push_back(Strim(sdk_task.ports[i].port_name));
-        
+
         //端口号不可重复
         if (sdk_task.ports[i].port.compare("dynamic") != 0) {
             it = find(vec_tasks_ports.begin(), vec_tasks_ports.end(), sdk_task.ports[i].port);
@@ -556,7 +565,7 @@ bool FillTaskDescription(const TaskDescription& sdk_task,
     if (!FillImagePackage(sdk_task.exe_package, task->mutable_exe_package())) {
         return false;
     }
-    
+
     if (!FilldataPackage(sdk_task.data_package, task->mutable_data_package())) {
         return false;
     }
@@ -583,7 +592,7 @@ bool FillTaskDescription(const TaskDescription& sdk_task,
         if (sdk_task.services[i].port_name.empty()) {
             continue;
         }
-    
+
         //检测service中port_name是否有重复
         it = find(vec_service_port_name.begin(), vec_service_port_name.end(), Strim(sdk_task.services[i].port_name));
         if (it != vec_service_port_name.end()) {
@@ -591,7 +600,7 @@ bool FillTaskDescription(const TaskDescription& sdk_task,
             ok = false;
             break;
         }
-        
+
         //检测使用的端口名称是否在本task的port中
         it = find(vec_task_port_names.begin(), vec_task_port_names.end(), Strim(sdk_task.services[i].port_name));
         if (it == vec_task_port_names.end()) {
@@ -613,7 +622,7 @@ bool FillPodDescription(const PodDescription& sdk_pod,
     //重复值检测
     std::vector<std::string> vec_des_path;
     vec_des_path.push_back(sdk_pod.workspace_volum.dest_path);
-    
+
     bool ok = true;
     for (size_t i = 0; i < sdk_pod.data_volums.size(); ++i) {
         ::baidu::galaxy::proto::VolumRequired* volum = pod->add_data_volums();
@@ -621,10 +630,10 @@ bool FillPodDescription(const PodDescription& sdk_pod,
         if (!ok) {
             break;
         }
-        
+
         //重复值检测
-        std::vector<std::string> ::iterator it = find(vec_des_path.begin(), 
-                                                      vec_des_path.end(), 
+        std::vector<std::string> ::iterator it = find(vec_des_path.begin(),
+                                                      vec_des_path.end(),
                                                       Strim(sdk_pod.data_volums[i].dest_path));
         if (it != vec_des_path.end()) {
             fprintf(stderr, "dest_path in volums cannot be repeated\n");
@@ -646,8 +655,8 @@ bool FillPodDescription(const PodDescription& sdk_pod,
     std::vector<std::string> tasks_vec_ports; //端口号重复检测
     std::vector<std::string> vec_service_names; //service name重复值检测
     for (uint32_t i = 0; i < sdk_pod.tasks.size(); ++i) {
-        ::baidu::galaxy::proto::TaskDescription* task = pod->add_tasks(); 
-        ok = FillTaskDescription(sdk_pod.tasks[i], task, tasks_vec_ports, 
+        ::baidu::galaxy::proto::TaskDescription* task = pod->add_tasks();
+        ok = FillTaskDescription(sdk_pod.tasks[i], task, tasks_vec_ports,
                                  vec_service_names);
 
         if (!ok) {
@@ -682,7 +691,14 @@ bool FillDeploy(const Deploy& sdk_deploy, ::baidu::galaxy::proto::Deploy* deploy
         return false;
     }
     deploy->set_max_per_host(sdk_deploy.max_per_host);
-    
+
+    if (sdk_deploy.stop_timeout > 120) {
+        fprintf(stderr, "stop timeout must be little than 120s\n");
+        fflush(stderr);
+        return false;
+    }
+    deploy->set_stop_timeout(sdk_deploy.stop_timeout);
+
     deploy->set_tag(Strim(sdk_deploy.tag));
 
     if (sdk_deploy.pools.size() == 0) {
@@ -743,7 +759,7 @@ bool FillJobDescription(const JobDescription& sdk_job,
             fprintf(stderr, "volum_jobs[%d] must not be empty\n", (int)i);
             return false;
         }
-        job->add_volum_jobs(volum_job); 
+        job->add_volum_jobs(volum_job);
     }
 
 
@@ -763,7 +779,7 @@ bool FillGrant(const Grant& sdk_grant, ::baidu::galaxy::proto::Grant* grant) {
     if (pool.empty()) {
         fprintf(stderr, "pool must not be empty\n");
         return false;
-    } 
+    }
     grant->set_pool(pool);
 
     if (sdk_grant.action == kActionAdd) {
@@ -829,9 +845,15 @@ void PbJobDescription2SdkJobDescription(const ::baidu::galaxy::proto::JobDescrip
     }
     job->version = pb_job.version();
     job->run_user = pb_job.run_user();
-    
+
+    if (pb_job.has_v2_support() && pb_job.v2_support()) {
+        job->v2_support = true;
+    } else {
+        job->v2_support = false;
+    }
+
     for (int i = 0; i < pb_job.volum_jobs().size(); ++i) {
-        job->volum_jobs.push_back(pb_job.volum_jobs(i)); 
+        job->volum_jobs.push_back(pb_job.volum_jobs(i));
     }
 
     job->deploy.replica = pb_job.deploy().replica();
@@ -839,11 +861,16 @@ void PbJobDescription2SdkJobDescription(const ::baidu::galaxy::proto::JobDescrip
     job->deploy.interval = pb_job.deploy().interval();
     job->deploy.max_per_host = pb_job.deploy().max_per_host();
     job->deploy.tag = pb_job.deploy().tag();
-    job->deploy.update_break_count = pb_job.deploy().update_break_count(); 
+    job->deploy.update_break_count = pb_job.deploy().update_break_count();
+
+    if (pb_job.deploy().has_stop_timeout()) {
+        job->deploy.stop_timeout = pb_job.deploy().stop_timeout();
+    }
+
     for (int i = 0; i < pb_job.deploy().pools().size(); ++i) {
         job->deploy.pools.push_back(pb_job.deploy().pools(i));
     }
-    
+
     job->pod.workspace_volum.size = pb_job.pod().workspace_volum().size();
     job->pod.workspace_volum.type = (VolumType)pb_job.pod().workspace_volum().type();
     job->pod.workspace_volum.medium = (VolumMedium)pb_job.pod().workspace_volum().medium();
@@ -873,6 +900,9 @@ void PbJobDescription2SdkJobDescription(const ::baidu::galaxy::proto::JobDescrip
         task.cpu.excess = pb_job.pod().tasks(i).cpu().excess();
         task.memory.size = pb_job.pod().tasks(i).memory().size();
         task.memory.excess = pb_job.pod().tasks(i).memory().excess();
+        if (pb_job.pod().tasks(i).memory().has_use_galaxy_killer()) {
+            task.memory.use_galaxy_killer = pb_job.pod().tasks(i).memory().use_galaxy_killer();
+        }
         task.tcp_throt.recv_bps_quota = pb_job.pod().tasks(i).tcp_throt().recv_bps_quota();
         task.tcp_throt.recv_bps_excess = pb_job.pod().tasks(i).tcp_throt().recv_bps_excess();
         task.tcp_throt.send_bps_quota = pb_job.pod().tasks(i).tcp_throt().send_bps_quota();
@@ -901,13 +931,13 @@ void PbJobDescription2SdkJobDescription(const ::baidu::galaxy::proto::JobDescrip
         }
         for (int j = 0; j < pb_job.pod().tasks(i).services().size(); ++j) {
             Service service;
-            service.service_name = pb_job.pod().tasks(i).services(j).service_name(); 
-            service.port_name = pb_job.pod().tasks(i).services(j).port_name(); 
-            service.use_bns = pb_job.pod().tasks(i).services(j).use_bns(); 
+            service.service_name = pb_job.pod().tasks(i).services(j).service_name();
+            service.port_name = pb_job.pod().tasks(i).services(j).port_name();
+            service.use_bns = pb_job.pod().tasks(i).services(j).use_bns();
             service.tag = pb_job.pod().tasks(i).services(j).tag();
             service.health_check_type = pb_job.pod().tasks(i).services(j).health_check_type();
             service.health_check_script = pb_job.pod().tasks(i).services(j).health_check_script();
-            //service.token = pb_job.pod().tasks(i).services(j).token(); 
+            //service.token = pb_job.pod().tasks(i).services(j).token();
             task.services.push_back(service);
         }
         job->pod.tasks.push_back(task);

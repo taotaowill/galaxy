@@ -86,6 +86,14 @@ enum UpdateAction {
     kActionRecreate = 4;
 }
 
+enum ForceAction {
+    kForceActionNull = 1;
+    kForceActionRebuild = 2;
+    kForceActionReload = 3;
+    kForceActionTerminate = 4;
+    kForceActionQuit = 5;
+}
+
 message PodInfo {
     optional string podid = 1;
     optional string jobid = 2;
@@ -100,6 +108,7 @@ message PodInfo {
     optional int64 send_rebuild_time = 11;
     repeated ServiceInfo services = 12;
     optional PodStatus reload_status = 13;
+    optional ForceAction action = 14;
 }
 
 message JobInfo {
@@ -192,6 +201,17 @@ message NamingInstance {
     optional string deploy_path = 10;
 }
 
+message ManualOperateRequest {
+    optional User user = 1;
+    optional string jobid = 2;
+    optional string podid = 3;
+    optional ForceAction action = 4;
+}
+
+message ManualOperateResponse {
+    optional ErrorCode error_code = 1;
+}
+
 service AppMaster {
     //for app-worker: report & task assignment
     rpc FetchTask(FetchTaskRequest) returns (FetchTaskResponse);
@@ -212,4 +232,5 @@ service AppMaster {
     rpc ExecuteCmd(ExecuteCmdRequest) returns (ExecuteCmdResponse); 
     // op
     rpc UpdateJobUser(UpdateJobUserRequest) returns (UpdateJobUserResponse);
+    rpc ManualOperate(ManualOperateRequest) returns (ManualOperateResponse);
 }

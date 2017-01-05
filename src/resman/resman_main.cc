@@ -14,6 +14,7 @@
 #include "resman_impl.h"
 #include "setting_utils.h"
 #include "util.h"
+#include "event_log.h"
 
 DECLARE_string(resman_port);
 
@@ -54,8 +55,16 @@ int main(int argc, char* argv[]) {
     signal(SIGTERM, SignalIntHandler);
 
     LOG(INFO) << "resman started.";
+    baidu::galaxy::EventLog ev("resman");
+    LOG(ERROR) << ev
+        .AppendTime("time").Append("endpoint", rm_endpoint)
+        .Append("action", "start").Append("status", "kOk")
+        .Append("detail", "resource manager start ok").ToString();
+
     while (!s_quit) {
         sleep(1);
     }
+
     return 0;
 }
+

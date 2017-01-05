@@ -13,6 +13,7 @@
 #include <gflags/gflags.h>
 #include "setting_utils.h"
 #include "util.h"
+#include "utils/event_log.h"
 #include "appmaster_impl.h"
 
 DECLARE_string(appmaster_port);
@@ -49,6 +50,10 @@ int main(int argc, char* argv[]) {
     signal(SIGINT, SignalIntHandler);
     signal(SIGTERM, SignalIntHandler);
 
+    baidu::galaxy::EventLog ev("appmaster");
+    LOG(ERROR) << ev.AppendTime("time")
+        .Append("endpoint", appmaster_endpoint)
+        .Append("action", "start").ToString();
     LOG(INFO) << "appmaster started.";
     while (!s_quit) {
         sleep(1);

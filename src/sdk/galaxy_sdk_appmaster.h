@@ -23,6 +23,7 @@ public:
     virtual bool ShowJob(const ShowJobRequest& request, ShowJobResponse* response) = 0;
     virtual bool RecoverInstance(const RecoverInstanceRequest& request, RecoverInstanceResponse* response) = 0;
     virtual bool ExecuteCmd(const ExecuteCmdRequest& request, ExecuteCmdResponse* response) = 0;
+    virtual bool ManualOperate(const ManualOperateRequest& request, ManualOperateResponse* response) = 0;
 };
 
 } //end namespace sdk

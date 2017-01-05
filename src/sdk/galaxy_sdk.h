@@ -6,6 +6,7 @@
 #include <string>
 #include <stdint.h>
 #include <vector>
+#include <set>
 
 namespace baidu {
 namespace galaxy {
@@ -88,14 +89,22 @@ struct Volum {
     int64_t assigned_size;
     VolumMedium medium;
 };
+
 struct CpuRequired {
     int64_t milli_core;
     bool excess;
 };
 struct MemoryRequired {
+    MemoryRequired() :
+        size(1024),
+        excess(false),
+        use_galaxy_killer(false) {}
+
     int64_t size;
     bool excess;
+    bool use_galaxy_killer;
 };
+
 struct TcpthrotRequired {
     int64_t recv_bps_quota;
     bool recv_bps_excess;
@@ -123,6 +132,7 @@ struct VolumRequired {
     bool readonly;
     bool exclusive;
     bool use_symlink;
+    bool preserved;
 };
 enum UpdateJobOperate {
     kUpdateJobStart = 1,
@@ -171,9 +181,13 @@ struct Package {
     std::string version;
 };
 struct ImagePackage {
+    ImagePackage() :
+        stop_timeout(30) {}
+
     Package package;
     std::string start_cmd;
     std::string stop_cmd;
+    int32_t stop_timeout;
     std::string health_cmd;
 };
 struct DataPackage {
@@ -181,6 +195,14 @@ struct DataPackage {
     std::string reload_cmd;
 };
 struct Deploy {
+    Deploy() : replica(1),
+    step(1),
+    interval(1),
+    max_per_host(1),
+    update_break_count(1),
+    stop_timeout(30) {
+    }
+
     uint32_t replica;
     uint32_t step;
     uint32_t interval;
@@ -188,6 +210,7 @@ struct Deploy {
     std::string tag;
     std::vector<std::string> pools;
     uint32_t update_break_count;
+    uint32_t stop_timeout;
 };
 struct Service {
     std::string service_name;
@@ -249,7 +272,7 @@ struct ContainerDescription {
     int32_t max_per_host;
     std::string tag;
     std::vector<std::string> pool_names;
-    std::vector<std::string> volum_jobs; //dependent volum jobs' id 
+    std::vector<std::string> volum_jobs; //dependent volum jobs' id
     ContainerType container_type;
 };
 enum ContainerStatus {
@@ -278,6 +301,22 @@ enum Status {
    kRemoveAgentFail = 10,
    kCreateTagFail = 11,
    kAddAgentToPoolFail = 12,
+   kAddUserFail = 13,
+   kRemoveUserFail = 14,
+   kGrantUserFail = 15,
+   kAssignQuotaFail = 16,
+   kRebuild = 17,
+   kReload = 18,
+   kStatusConflict = 19,
+   kJobTerminateFail = 20,
+   kSuspend = 21,
+   kQuit = 22,
+   kPodNotFound = 23,
+   kUserNotMatch = 24,
+   kManualRebuild = 25,
+   kManualReload = 26,
+   kManualTerminate = 27,
+   kManualQuit = 28,
 };
 struct ErrorCode {
     Status status;
@@ -288,6 +327,7 @@ enum AgentStatus {
     kAgentAlive = 1,
     kAgentDead = 2,
     kAgentOffline = 3,
+    kAgentFreezed = 4,
 };
 
 struct EnterSafeModeRequest {
@@ -480,6 +520,20 @@ struct AssignQuotaRequest {
 struct AssignQuotaResponse {
     ErrorCode error_code;
 };
+struct FreezeAgentRequest {
+    User user;
+    std::string endpoint;
+};
+struct FreezeAgentResponse {
+    ErrorCode error_code;
+};
+struct ThawAgentRequest {
+    User user;
+    std::string endpoint;
+};
+struct ThawAgentResponse {
+    ErrorCode error_code;
+};
 struct CreateContainerGroupRequest {
     User user;
     uint32_t replica;
@@ -655,6 +709,24 @@ struct ExecuteCmdResponse {
     ErrorCode error_code;
 };
 
+enum ForceAction {
+    kForceActionNull = 1,
+    kForceActionRebuild = 2,
+    kForceActionReload = 3,
+    kForceActionTerminate = 4,
+    kForceActionQuit = 5,
+};
+
+struct ManualOperateRequest {
+    User user;
+    std::string jobid;
+    std::string podid;
+    ForceAction action;
+};
+struct ManualOperateResponse {
+    ErrorCode error_code;
+};
+
 struct StopJobRequest {
     User user;
     std::string hostname;
@@ -681,6 +753,16 @@ struct RecoverInstanceRequest {
 };
 
 struct RecoverInstanceResponse {
+    ErrorCode error_code;
+};
+
+struct RemoveTagsFromAgentRequest {
+    User user;
+    std::string endpoint;
+    std::set<std::string> tags;
+};
+
+struct RemoveTagsFromAgentResponse {
     ErrorCode error_code;
 };
 

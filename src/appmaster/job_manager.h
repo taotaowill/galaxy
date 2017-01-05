@@ -32,6 +32,7 @@ using ::baidu::galaxy::proto::kError;
 using ::baidu::galaxy::proto::kTerminate;
 using ::baidu::galaxy::proto::kAddAgentFail;
 using ::baidu::galaxy::proto::kSuspend;
+using ::baidu::galaxy::proto::kDeny;
 using ::baidu::galaxy::proto::kJobNotFound;
 using ::baidu::galaxy::proto::kPodNotFound;
 using ::baidu::galaxy::proto::kUserNotMatch;
@@ -41,6 +42,10 @@ using ::baidu::galaxy::proto::kUpdateContainerGroupFail;
 using ::baidu::galaxy::proto::kRebuild;
 using ::baidu::galaxy::proto::kReload;
 using ::baidu::galaxy::proto::kQuit;
+using ::baidu::galaxy::proto::kManualRebuild;
+using ::baidu::galaxy::proto::kManualReload;
+using ::baidu::galaxy::proto::kManualTerminate;
+using ::baidu::galaxy::proto::kManualQuit;
 using ::baidu::galaxy::proto::kStatusConflict;
 using ::baidu::galaxy::proto::kJobTerminateFail;
 using ::baidu::galaxy::proto::kJobPending; 
@@ -57,10 +62,16 @@ using ::baidu::galaxy::proto::kUpdateFinish;
 using ::baidu::galaxy::proto::kPauseUpdate;
 using ::baidu::galaxy::proto::kUpdateContinue;
 using ::baidu::galaxy::proto::kUpdateRollback;
+using ::baidu::galaxy::proto::kUpdateCancel;
 using ::baidu::galaxy::proto::kActionNull;
 using ::baidu::galaxy::proto::kActionReload;
 using ::baidu::galaxy::proto::kActionRebuild;
 using ::baidu::galaxy::proto::kActionRecreate;
+using ::baidu::galaxy::proto::kForceActionNull;
+using ::baidu::galaxy::proto::kForceActionRebuild;
+using ::baidu::galaxy::proto::kForceActionReload;
+using ::baidu::galaxy::proto::kForceActionTerminate;
+using ::baidu::galaxy::proto::kForceActionQuit;
 using ::baidu::galaxy::proto::kPodPending;
 using ::baidu::galaxy::proto::kPodReady;
 using ::baidu::galaxy::proto::kPodDeploying;
@@ -114,21 +125,25 @@ public:
     void Start();
     Status Add(const JobId& job_id, const JobDescription& job_desc, const User& user);
     Status Update(const JobId& job_id, const JobDescription& job_desc,
-                    bool container_change);
+                  bool container_change);
     Status Terminate(const JobId& jobid, const User& user);
     Status PauseUpdate(const JobId& job_id);
     Status ContinueUpdate(const JobId& job_id, int32_t break_point);
+    Status CancelUpdate(const JobId& job_id);
     Status Rollback(const JobId& job_id);
 
 
     Status HandleFetch(const ::baidu::galaxy::proto::FetchTaskRequest* request,
                      ::baidu::galaxy::proto::FetchTaskResponse* response);
     Status RecoverPod(const User& user, const std::string jobid, const std::string podid);
+    Status ManualOperatePod(const User& user, const std::string jobid,
+                            const std::string podid, proto::ForceAction action);
 
     void ReloadJobInfo(const JobInfo& job_info);
     void GetJobsOverview(JobOverviewList* jobs_overview);
     void SetResmanEndpoint(std::string new_endpoint);
     Status GetJobInfo(const JobId& jobid, JobInfo* job_info);
+    Status UpdateUser(const JobId& jobid, const User& user);
     JobDescription GetLastDesc(const JobId jonid);
     void Run();
     JobManager();
@@ -155,6 +170,7 @@ private:
     Status RemoveJob(Job* job, void* arg);
     Status ClearJob(Job* job, void* arg);
     Status PauseUpdateJob(Job* job, void * arg);
+    Status CancelUpdateJob(Job* job, void * arg);
     PodInfo* CreatePod(Job* job,
                 std::string podid,
                 std::string endpoint);

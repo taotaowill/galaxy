@@ -104,7 +104,7 @@ message AgentStatistics {
     optional Resource memory = 6;
     repeated VolumResource volums = 7;
     optional uint32 total_containers = 8;
-    
+
 }
 
 message ListAgentsResponse {
@@ -144,7 +144,7 @@ message ListAgentsByTagResponse {
 
 message GetTagsByAgentRequest {
     optional User user = 1;
-    optional string endpoint = 2; 
+    optional string endpoint = 2;
 }
 
 message GetTagsByAgentResponse {
@@ -195,7 +195,7 @@ message GetPoolByAgentResponse {
 
 message AddUserRequest {
     optional User admin = 1;
-    optional User user = 2; 
+    optional User user = 2;
 }
 
 message AddUserResponse {
@@ -204,7 +204,7 @@ message AddUserResponse {
 
 message RemoveUserRequest {
     optional User admin = 1;
-    optional User user = 2; 
+    optional User user = 2;
 }
 
 message RemoveUserResponse {
@@ -212,7 +212,7 @@ message RemoveUserResponse {
 }
 
 message ListUsersRequest {
-    optional User user = 1; 
+    optional User user = 1;
 }
 
 message ListUsersResponse {
@@ -222,7 +222,7 @@ message ListUsersResponse {
 
 message ShowUserRequest {
     optional User admin = 1;
-    optional User user = 2; 
+    optional User user = 2;
 }
 
 message ShowUserResponse {
@@ -244,7 +244,7 @@ message GrantUserResponse {
 
 message AssignQuotaRequest {
     optional User admin = 1;
-    optional User user = 2; 
+    optional User user = 2;
     optional Quota quota = 3;
 }
 
@@ -253,7 +253,7 @@ message AssignQuotaResponse {
 }
 
 message CreateContainerGroupRequest {
-    optional User user = 1; 
+    optional User user = 1;
     optional uint32 replica = 2;
     optional string name = 3;
     optional ContainerDescription desc = 4;
@@ -265,7 +265,7 @@ message CreateContainerGroupResponse {
 }
 
 message RemoveContainerGroupRequest {
-    optional User user = 1; 
+    optional User user = 1;
     optional string id = 2;
 }
 
@@ -274,12 +274,12 @@ message RemoveContainerGroupResponse {
 }
 
 message UpdateContainerGroupRequest {
-    optional User user = 1; 
+    optional User user = 1;
     optional uint32 replica = 2;
     optional string id = 3;
     optional uint32 interval = 4;
     optional ContainerDescription desc = 5;
-} 
+}
 
 message UpdateContainerGroupResponse {
     optional ErrorCode error_code = 1;
@@ -287,7 +287,7 @@ message UpdateContainerGroupResponse {
 }
 
 message ListContainerGroupsRequest {
-    optional User user = 1; 
+    optional User user = 1;
 }
 
 message ListContainerGroupsResponse {
@@ -326,16 +326,46 @@ message PreemptResponse {
     optional ErrorCode error_code = 1;
 }
 
+message FreezeAgentRequest {
+    optional User user = 1;
+    optional string endpoint = 2;
+}
+
+message FreezeAgentResponse {
+    optional ErrorCode error_code = 1;
+}
+
+message ThawAgentRequest {
+    optional User user = 1;
+    optional string endpoint = 2;
+}
+
+message ThawAgentResponse {
+    optional ErrorCode error_code = 1;
+}
+
+message RemoveTagsFromAgentRequest {
+    optional User user = 1;
+    optional string endpoint = 2;
+    repeated string tags = 3;
+}
+
+message RemoveTagsFromAgentResponse {
+    optional ErrorCode error_code = 1;
+}
+
 service ResMan {
 
     //op api
     rpc EnterSafeMode(EnterSafeModeRequest) returns (EnterSafeModeResponse);
     rpc LeaveSafeMode(LeaveSafeModeRequest) returns (LeaveSafeModeResponse);
     rpc Preempt(PreemptRequest) returns (PreemptResponse);
+    rpc FreezeAgent(FreezeAgentRequest) returns (FreezeAgentResponse);
+    rpc ThawAgent(ThawAgentRequest) returns (ThawAgentResponse);
 
     rpc Status(StatusRequest) returns (StatusResponse);
 
-    //internal RPC 
+    //internal RPC
     rpc KeepAlive(KeepAliveRequest) returns (KeepAliveResponse);
 
     //container
@@ -363,7 +393,8 @@ service ResMan {
     //tag man
     rpc CreateTag(CreateTagRequest) returns (CreateTagResponse);
     rpc ListTags(ListTagsRequest) returns (ListTagsResponse);
-   
+    rpc RemoveTagsFromAgent(RemoveTagsFromAgentRequest) returns (RemoveTagsFromAgentResponse);
+
     // tag <--> agent
     rpc ListAgentsByTag(ListAgentsByTagRequest) returns (ListAgentsByTagResponse);
     rpc GetTagsByAgent(GetTagsByAgentRequest) returns (GetTagsByAgentResponse);

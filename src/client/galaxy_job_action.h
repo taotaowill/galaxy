@@ -30,6 +30,7 @@ public:
     bool ExecuteCmd(const std::string& jobid, const std::string& cmd);
     bool CalRes(const std::string& json_file, const std::string& soptions);
     bool GenerateJson(const std::string& jobid);
+    bool OperatePod(const std::string& jobid, const std::string& podid, const std::string& action);
 
 private:
     bool Init();

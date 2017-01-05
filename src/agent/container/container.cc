@@ -36,13 +36,14 @@
 #include <iostream>
 #include <sstream>
 
-
 DECLARE_string(agent_ip);
 DECLARE_string(agent_port);
 DECLARE_string(agent_hostname);
 DECLARE_string(cmd_line);
 DECLARE_string(volum_resource);
 DECLARE_string(extra_volum_resource);
+DECLARE_string(galaxy_root_path);
+DECLARE_int32(kill_timeout);
 
 namespace baidu {
 namespace galaxy {
@@ -119,7 +120,7 @@ baidu::galaxy::util::ErrorCode Container::Destroy() {
         return ERRORCODE(-1, "status machine");
     }
 
-    SetExpiredTimeIfAbsent(30);
+    SetExpiredTimeIfAbsent(FLAGS_kill_timeout);
     LOG(INFO) << Id().CompactId() << " try kill appworker";
 
     if (!Expired() && Alive() && TryKill()) {
@@ -130,7 +131,7 @@ baidu::galaxy::util::ErrorCode Container::Destroy() {
                 LOG(WARNING) << Id().CompactId() << "enter ready failed: " << ec.Message();
             }
 
-            return ERRORCODE(-1, "try kill appwork failed");
+            return ERRORCODE(-1, "waiting for appworker to kill process");
         }
     }
 
@@ -485,6 +486,7 @@ void Container::ExportEnv(std::map<std::string, std::string>& env) {
     env["baidu_galaxy_agent_ip"] = FLAGS_agent_ip;
     env["baidu_galaxy_agent_port"] = FLAGS_agent_port;
     env["baidu_galaxy_container_user"] = desc_.run_user();
+    env["baidu_galaxy_contaienr_root_abspath"] = FLAGS_galaxy_root_path + "/" + id_.SubId();
 }
 
 /*baidu::galaxy::proto::ContainerStatus Container::Status()

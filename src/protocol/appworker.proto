@@ -3,12 +3,20 @@ package baidu.galaxy.proto;
 
 option cc_generic_services = true;
 
+message ProcessEnv {
+    optional string user = 1;
+    optional string job_id = 2;
+    optional string pod_id = 3;
+    optional string task_id = 4;
+}
+
 message Process {
     optional string process_id = 1;
     optional int32 pid = 2;
     optional ProcessStatus status = 3;
     optional int32 exit_code = 4;
     optional int32 fail_retry_times = 5;
+    optional ProcessEnv env = 6;
 }
 
 message ProcessManager {

@@ -9,6 +9,7 @@
 #include "cgroup/subsystem_factory.h"
 #include "collector/collector_engine.h"
 #include "util/path_tree.h"
+#include "utils/event_log.h"
 
 #include <string>
 #include <sstream>
@@ -22,6 +23,7 @@
 
 DECLARE_string(agent_ip);
 DECLARE_string(agent_port);
+DECLARE_string(agent_hostname);
 DECLARE_int32(keepalive_interval);
 DECLARE_string(galaxy_root_path);
 
@@ -73,7 +75,6 @@ void AgentImpl::HandleMasterChange(const std::string& new_master_endpoint)
 
 void AgentImpl::Setup()
 {
-
     baidu::galaxy::path::SetRootPath(FLAGS_galaxy_root_path);
     running_ = true;
     if (0 != rm_->Load()) {
@@ -109,13 +110,17 @@ void AgentImpl::KeepAlive(int internal_ms)
     request.set_endpoint(agent_endpoint_);
 
     boost::mutex::scoped_lock lock(rpc_mutex_);
-    if (!master_rpc_->SendRequest(resman_stub_,
-            &galaxy::proto::ResMan_Stub::KeepAlive,
-            &request,
-            &response,
-            5,
-            1)) {
-        LOG(WARNING) << "keep alive failed";
+    if (NULL != resman_stub_) {
+        if (!master_rpc_->SendRequest(resman_stub_,
+                        &galaxy::proto::ResMan_Stub::KeepAlive,
+                        &request,
+                        &response,
+                        5,
+                        1)) {
+            LOG(WARNING) << "keep alive failed";
+        }
+    } else {
+        LOG(WARNING) << "resman stub is null ...";
     }
 
     heartbeat_pool_.DelayTask(internal_ms, boost::bind(&AgentImpl::KeepAlive, this, internal_ms));
@@ -137,9 +142,26 @@ void AgentImpl::CreateContainer(::google::protobuf::RpcController* controller,
     if (0 != err.Code()) {
         ec->set_status(baidu::galaxy::proto::kError);
         ec->set_reason(err.ShortMessage());
+        baidu::galaxy::EventLog ev("container");
+        LOG(ERROR) << ev.AppendTime("time")
+            .Append("container-id", request->id())
+            .Append("container-group-id", request->container_group_id())
+            .Append("hostname", FLAGS_agent_hostname)
+            .Append("endpoint", agent_endpoint_)
+            .Append("action", "create")
+            .Append("status", "kError")
+            .Append("detail", err.Message()).ToString();
     } else {
         ec->set_status(baidu::galaxy::proto::kOk);
         ec->set_reason("sucess");
+        baidu::galaxy::EventLog ev("container");
+        LOG(ERROR) << ev.AppendTime("time")
+            .Append("container-id", request->id())
+            .Append("container-group-id", request->container_group_id())
+            .Append("hostname", FLAGS_agent_hostname)
+            .Append("endpoint", agent_endpoint_)
+            .Append("action", "create")
+            .Append("status", "kOk").ToString();
     }
 
     done->Run();
@@ -160,9 +182,30 @@ void AgentImpl::RemoveContainer(::google::protobuf::RpcController* controller,
     if (0 != ret.Code()) {
         ec->set_status(baidu::galaxy::proto::kError);
         ec->set_reason(ret.ShortMessage());
+        baidu::galaxy::EventLog ev("container");
+        LOG(ERROR) << ev.AppendTime("time")
+            .Append("container-id", request->id())
+            .Append("container-group-id", request->container_group_id())
+            .Append("hostname", FLAGS_agent_hostname)
+            .Append("endpoint", agent_endpoint_)
+            .Append("action", "remove")
+            .Append("status", "kError")
+            .Append("detail", ret.Message()).ToString();
+
     } else {
         ec->set_status(baidu::galaxy::proto::kOk);
         ec->set_reason("sucess");
+
+        baidu::galaxy::EventLog ev("container");
+        LOG(ERROR) << ev.AppendTime("time")
+            .Append("container-id", request->id())
+            .Append("container-group-id", request->container_group_id())
+            .Append("hostname", FLAGS_agent_hostname)
+            .Append("endpoint", agent_endpoint_)
+            .Append("action", "remove")
+            .Append("status", "kOk")
+            .Append("detail", request->DebugString()).ToString();
+
     }
     done->Run();
 }
