@@ -56,7 +56,7 @@ echo "--nexus_servers=$SERVERS"                                                 
 echo "--cmd_line=appworker --nexus_addr=$SERVERS --nexus_root_path=/galaxy_test"  >> galaxy.flag
 echo "--cpu_resource=4000"                                                        >> galaxy.flag
 echo "--memory_resource=4294967296"                                               >> galaxy.flag
-echo "--mount_templat=/bin,/boot,/sys/fs/cgroup,/dev,/etc,/lib,/lib64,/lost+found,/media,/misc,/mnt,/opt,/sbin,/selinux,/srv,/sys,/tmp,/usr,/var,/proc,/sys/fs/cgroup/cpu,/sys/fs/cgroup/memory,/sys/fs/cgroup/cpuacct,/sys/fs/cgroup/blkio,/sys/fs/cgroup/freezer,/sys/fs/cgroup/net_cls" >> galaxy.flag
+echo "--mount_templat=/bin,/boot,/sys/fs/cgroup,/dev,/etc,/lib,/lib64,/lost+found,/media,/mnt,/opt,/sbin,/srv,/sys,/tmp,/usr,/var,/proc,/sys/fs/cgroup/cpu,/sys/fs/cgroup/memory,/sys/fs/cgroup/cpuacct,/sys/fs/cgroup/blkio,/sys/fs/cgroup/freezer,/sys/fs/cgroup/net_cls" >> galaxy.flag
 echo "--agent_port=1025"                                                         >> galaxy.flag
 echo "--master_path=/resman"                                                     >> galaxy.flag
 echo "--galaxy_root_path=$ROOTPATH"                                              >> galaxy.flag
