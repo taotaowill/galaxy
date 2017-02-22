@@ -12,7 +12,7 @@ env = Environment(
         CPPPATH = ['.', 'src', 'src/agent', 'thirdparty/boost_1_57_0/', './thirdparty/include', './thirdparty/include/common', './thirdparty/rapidjson/include', 'src/utils'] ,
         LIBS = ['ins_sdk', 'sofa-pbrpc', 'protobuf', 'glog', 'gflags', 'tcmalloc', 'unwind', 'pthread', 'z', 'rt', 'boost_filesystem', 'gtest', 'common', 'leveldb', 'snappy'],
         LIBPATH = ['./thirdparty/lib', './thirdparty/boost_1_57_0/stage/lib'],
-        CCFLAGS = '-g2 -Wall -Werror -Wno-unused-but-set-variable',
+        CCFLAGS = '-g2 -Wall -Werror -Wno-unused-but-set-variable -D UBUNTU',
         LINKFLAGS = '-Wl,-rpath-link ./thirdparty/boost_1_57_0/stage/lib')
 
 env.Program('resman', Glob('src/resman/*.cc') + Glob('src/utils/*.cc')

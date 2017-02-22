@@ -28,5 +28,6 @@ killall ins
 
 rm -rf ./ins ./appmaster ./appworker ./resman ./agent ./galaxy_client ./galaxy_res_client
 rm -rf /ins.flag ./galaxy.flag
-rm -rf ./binlog *.log *.INFO* *.WARNING*
-rm -rf ./data ./gc_dir/ ./work_dir/
+rm -rf ./binlog *.log *.INFO* *.WARNING* *.EVENT* *.ERROR
+rm -rf ./data 
+#./gc_dir/ ./work_dir/

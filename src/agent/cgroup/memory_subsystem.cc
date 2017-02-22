@@ -75,6 +75,7 @@ baidu::galaxy::util::ErrorCode MemorySubsystem::Construct() {
                 err.Message().c_str());
     }
 
+    #ifndef UBUNTU
     int64_t excess_mode = this->cgroup_->memory().excess() ? 1L : 0L;
     boost::filesystem::path excess_mode_path = path;
     excess_mode_path.append("memory.excess_mode");
@@ -99,6 +100,7 @@ baidu::galaxy::util::ErrorCode MemorySubsystem::Construct() {
                 "attch memory.kill_mode failed: %s",
                 err.Message().c_str());
     }
+    #endif
 
     return ERRORCODE_OK;
 }

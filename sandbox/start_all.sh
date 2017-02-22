@@ -1,9 +1,7 @@
 #!/bin/bash
 
 HOSTNAME=`hostname`
-SERVERS="$HOSTNAME:8868,$HOSTNAME:8869,$HOSTNAME:8870,$HOSTNAME:8871,$HOSTNAME:8872"
-ROOTPATH=`pwd`
-IP=`hostname -i`
+SERVERS="$HOSTNAME:8868,$HOSTNAME:8869,$HOSTNAME:8870,$HOSTNAME:8871,$HOSTNAME:8872" ROOTPATH=`pwd` IP=`hostname -i`
 
 function assert_process_ok() {
     ps xf | grep "$1" | grep -v grep >/dev/null
@@ -51,21 +49,22 @@ echo "--sched_interval=10"                                                      
 echo "--agent_query_interval=2"                                                   >> galaxy.flag
 echo "# appmaster"                                                                >> galaxy.flag
 echo "--appmaster_port=8123"                                                      >> galaxy.flag
+echo "--appmaster_path=appmaster"                                                      >> galaxy.flag
 echo "# agent"                                                                    >> galaxy.flag
 echo "--nexus_root_path=/galaxy_test"                                             >> galaxy.flag
 echo "--nexus_servers=$SERVERS"                                                   >> galaxy.flag
 echo "--cmd_line=appworker --nexus_addr=$SERVERS --nexus_root_path=/galaxy_test"  >> galaxy.flag
 echo "--cpu_resource=4000"                                                        >> galaxy.flag
 echo "--memory_resource=4294967296"                                               >> galaxy.flag
-echo "--mount_templat=/bin,/boot,/cgroups,/dev,/etc,/lib,/lib64,/lost+found,/media,/misc,/mnt,/opt,/sbin,/selinux,/srv,/sys,/tmp,/usr,/var,/noah,/noah/download,/noah/modules,/noah/tmp,/noah/bin,/proc,/cgroups/cpu,/cgroups/memory,/cgroups/cpuacct,/cgroups/tcp_throt,/cgroups/blkio,/cgroups/freezer,/cgroups/net_cls,/home/opt" >> galaxy.flag
+echo "--mount_templat=/bin,/boot,/sys/fs/cgroup,/dev,/etc,/lib,/lib64,/lost+found,/media,/misc,/mnt,/opt,/sbin,/selinux,/srv,/sys,/tmp,/usr,/var,/proc,/sys/fs/cgroup/cpu,/sys/fs/cgroup/memory,/sys/fs/cgroup/cpuacct,/sys/fs/cgroup/blkio,/sys/fs/cgroup/freezer,/sys/fs/cgroup/net_cls" >> galaxy.flag
 echo "--agent_port=1025"                                                         >> galaxy.flag
 echo "--master_path=/resman"                                                     >> galaxy.flag
 echo "--galaxy_root_path=$ROOTPATH"                                              >> galaxy.flag
-echo "--cgroup_root_path=/cgroups"                                               >> galaxy.flag
+echo "--cgroup_root_path=/sys/fs/cgroup"                                               >> galaxy.flag
 echo "--gc_delay_time=86400"                                                     >> galaxy.flag
 echo "--agent_ip=$IP"                                                            >> galaxy.flag
 echo "--agent_hostname=$HOSTNAME"                                                >> galaxy.flag
-echo "--volum_resource=/dev/vdb:2906620387328:DISK:/home/galaxy"                 >> galaxy.flag
+echo "--volum_resource=/dev/sda1:2906620387328:DISK:/home/galaxy"                 >> galaxy.flag
 
 # 2. start resman
 echo "start resman"
@@ -86,11 +85,11 @@ nohup ./agent --flagfile=galaxy.flag >agent.log 2>&1 &
 assert_process_ok "./agent"
 
 # galaxy options
-./galaxy_res_client add_agent -e 10.100.40.100:1025 -p main_pool
+./galaxy_res_client add_agent -e 127.0.1.1:1025 -p main_pool
 ./galaxy_res_client add_user -u test -t test
 ./galaxy_res_client grant_user -u test -p main_pool -o add -a create_container,remove_container,update_container,list_containers,submit_job,remove_job,update_job,list_jobs
 ./galaxy_res_client assign_quota -u test -c 4000 -d 4G  -s 1M e -m 4G -r 1000
 
 sleep 20
 ./galaxy_client submit -f test.json
-./galaxy_client submit -f over.json
+#./galaxy_client submit -f over.json
